@@ -40,6 +40,8 @@ define
    SpawnAllPoint
    AlertPosBonus
    SpawnAllBonus
+   GetType
+   Move
 
 in
 %%%%%%%%%%%% Create Pacman %%%%%%%%%%%%%
@@ -262,10 +264,49 @@ in
      end
    end
 
+   fun {GetType T}
+     case {Record.label T} of pacman then
+       'Pacman'
+     [] ghost then
+       'Ghost'
+     end
+   end
 
+   fun {Move Player Port Wall}
+     fun {IsOutOfBound Pos}
+       if Pos.x < 1 then true
+       elseif Pos.y < 1 then true
+       elseif Pos.x > Input.nColumn-1 then true
+       elseif Pos.y > Input.nRow-1 then true
+       else
+         false
+       end
+     end
+     fun {IsWrongMove Pos Wall}
+       case Wall of nil then false
+       [] H|T then
+         if H == Pos then
+           true
+         else
+           {IsWrongMove Pos T}
+         end
+       end
+     end
+     ID
+     Pos
+   in
+     {Send Port move(ID Pos)}
+     if {IsWrongMove Pos Wall} then
+       {Move Player Port Wall}
+     elseif {IsOutOfBound Pos} then
+       {Move Player Port Wall}
+     else
+       Pos
+     end
+   end
 
    proc {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-GPort GState PlrState Order Next NbTurn}
+GPort GState PlrState PlrPort Next NbTurn}
      if NbTurn == 1 then
        {SpawnAllPacman GUI PPort PState PSpawn GPort}
        {SpawnAllGhost GUI GPort GState GSpawn PPort}
@@ -273,7 +314,19 @@ GPort GState PlrState Order Next NbTurn}
        {SpawnAllBonus GUI Bonus PPort}
      end
 %%%%%%%%%%%%%%%%%%%%% TURN %%%%%%%%%%%%%%%%%%%%%%%%%
-      {Browser.browse 'TODO'}
+      case Next of nil then {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
+   GPort GState PlrState PlrPort Next NbTurn+1}
+      [] H|T then
+      Type = {GetType H}
+      NewPos
+      in
+        %%To do : is alive
+        NewPos = {Move H PlrPort.1 Wall}
+        {Send GUI movePacman(H NewPos)}
+        {AlertPosPacman GPort H NewPos}
+        {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
+     GPort GState PlrState PlrPort Next NbTurn+1}
+      end
    end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    thread
@@ -306,7 +359,7 @@ GPort GState PlrState Order Next NbTurn}
       if Input.isTurnByTurn then
         {GameTurnByTurn WindowPort ListPointInMap ListWallInMap
 ListSpawnPacmanInMap ListSpawnGhostInMap ListBonusInMap PacmanPort
-PacmanState GhostPort GhostState PlayerState PlayerPort PlayerPort 1}
+PacmanState GhostPort GhostState PlayerState PlayerPort PlayerState 1}
       end
    end
 end
