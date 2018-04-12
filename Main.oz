@@ -358,10 +358,12 @@ GPort GState PlrState PlrPort PosPlayer Round NbTurn}
         LastPos = {List.nth PosPlayer Round}
         NewPos
         NewPosPlayer
+        X
       in %%%To do is alive
         %Maybe this function will be erase after teacher IA correction
         % THANKS PETER ....
-        NewPos = {Move ID Port Wall LastPos}
+        %NewPos = {Move ID Port Wall LastPos}
+        {Send Port move(X NewPos)}
         %%To do east to west if outbound but no wall ?
         if Type == 'Pacman' then
           {AlertPosPacman GPort ID NewPos}

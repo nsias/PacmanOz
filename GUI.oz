@@ -6,7 +6,7 @@ import
 export
    portWindow:StartWindow
 define
-
+   
    StartWindow
    TreatStream
 
@@ -19,7 +19,7 @@ define
    SpawnGhost
    SpawnBonus
    SpawnPoint
-
+   
    MovePacman
    MoveGhost
 
@@ -27,14 +27,14 @@ define
    HideGhost
    HideBonus
    HidePoint
-
+   
    UpdateScore
    UpdateLife
-
+   
    ChangeMode
 
    BuildWindow
-
+   
    Squares
    DrawMap
 
@@ -51,7 +51,7 @@ in
       DescLife=grid(handle:GridLife height:100 width:50*Input.nbPacman)
       DescScore=grid(handle:GridScore height:100 width:50*Input.nbPacman)
       Window={QTk.build td(Toolbar Desc DescLife DescScore)}
-
+  
       {Window show}
 
       % configure rows and set headers
@@ -76,13 +76,13 @@ in
       for N in 1..(Input.nbPacman) do
 	 {GridScore columnconfigure(N+1 minsize:50 weight:0 pad:5)}
       end
-
+      
       {DrawMap Grid}
-
+      
       handle(grid:Grid life:GridLife score:GridScore)
    end
 
-
+   
 %%%%% Squares of path and wall
    Squares = square(0:label(text:"" width:1 height:1 bg:c(0 0 204))
 		    1:label(text:"" borderwidth:5 relief:raised width:1 height:1 bg:c(0 0 0))
@@ -90,7 +90,7 @@ in
 		    3:label(text:"" width:1 height:1 bg:c(0 0 255))
 		    4:label(text:"" width:1 height:1 bg:c(0 150 150))
 		   )
-
+   
 %%%%% Function to draw the map
    proc{DrawMap Grid}
       proc{DrawColumn Column M N}
@@ -130,7 +130,7 @@ in
       guiPacman(id:ID life:HandleLife score:HandleScore pacman:Handle)
    end
 
-
+   
    fun{SpawnPacman Position}
       fun{$ Grid State}
 	 {Grid.grid configure(State.pacman row:Position.y column:Position.x sticky:wesn)}
@@ -149,7 +149,7 @@ in
 	 State
       end
    end
-
+   
    fun{InitGhost Grid ID}
       Handle Color LabelGhost
    in
@@ -159,7 +159,7 @@ in
       {Grid.grid remove(Handle)}
       guiGhost(id:ID ghost:Handle color:Color)
    end
-
+   
    fun{SpawnGhost Position}
       fun{$ Grid State}
 	 {Grid.grid configure(State.ghost row:Position.y column:Position.x sticky:wesn)}
@@ -185,7 +185,7 @@ in
 	 State
       end
    end
-
+   
    fun{UpdateScore Score}
       fun{$ Grid State}
 	 {State.score set(Score)}
@@ -249,8 +249,8 @@ in
 	 end
 	 State.1|{ChangeMode M Next}
       end
-   end
-
+   end      
+   
    fun{StateModification Grid Wanted State Fun}
       case State
       of nil then nil
@@ -298,7 +298,7 @@ in
       {Browser.browse Stream.1}
       case Stream
       of nil then skip
-      [] buildWindow|T then NewGrid in
+      [] buildWindow|T then NewGrid in 
 	 NewGrid = {BuildWindow}
 	 {TreatStream T NewGrid Pacmans Ghosts Point Bonus}
       [] initPacman(ID)|T then NewState in
@@ -311,7 +311,7 @@ in
       [] hidePacman(ID)|T then
 	 {TreatStream T Grid {StateModification Grid ID Pacmans {HidePacman}} Ghosts Point Bonus}
       [] initGhost(ID)|T then NewState in
-	 NewState = {InitGhost Grid ID}
+	 NewState = {InitGhost Grid ID} 
 	 {TreatStream T Grid Pacmans NewState|Ghosts Point Bonus}
       [] spawnGhost(ID Position)|T then
 	 {TreatStream T Grid Pacmans {StateModification Grid ID Ghosts {SpawnGhost Position}} Point Bonus}
@@ -344,8 +344,8 @@ in
 	 {TreatStream T Grid Pacmans Ghosts Point Bonus}
       end
    end
+   
+  
 
-
-
-
+   
 end
