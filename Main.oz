@@ -4,13 +4,11 @@ import
    Input
    PlayerManager
    Browser
-   System
 define
    WindowPort
    %Additionnal function %
    PacmanPort
    NewPacman
-   LoadPacman
    InitPacmanState
    ListPoint
    InitPacmanState
@@ -41,8 +39,13 @@ define
    AlertPosBonus
    SpawnAllBonus
    GetType
-   Move
+   IsInList
+   RemoveToList
+   AlertHidePoint
    UpdateList
+   RespawnPoint
+   CreateMissingList
+
 
 in
 %%%%%%%%%%%% Create Pacman %%%%%%%%%%%%%
@@ -287,47 +290,136 @@ in
    in
      {UpdatingList List NewElement NewNth 1}
    end
+
+   fun {IsInList L X}
+     case L of nil then false
+     [] H|T then
+       if H == X then true
+       else
+         {IsInList T X}
+       end
+     end
+   end
+
+   fun {RemoveToList L X}
+     case L of nil then nil
+     [] H|T then
+       if H == X then
+         {RemoveToList T X}
+       else
+         H|{RemoveToList T X}
+       end
+     end
+   end
+
+   proc {AlertHidePoint PPort Pos}
+     case PPort of nil then skip
+     [] H|T then
+       {Send H pointRemoved(Pos)}
+       {AlertHidePoint T Pos}
+     end
+   end
+
+
+   fun {CreateMissingList L1 L2}
+     fun {IsMissing L X}
+       case L of nil then true
+       [] H|T then
+         if H == X then false
+         else
+           {IsMissing T X}
+         end
+       end
+     end
+   in
+     case L1 of nil then nil
+     [] H|T then
+       if {IsMissing L2 H} then
+         H|{CreateMissingList T L2}
+       else
+         {CreateMissingList T L2}
+       end
+     end
+   end
+
+   proc {RespawnPoint GUI PPort NewPoint Point}
+     L = {CreateMissingList NewPoint Point}
+   in
+     {SpawnAllPoint GUI L PPort}
+   end
+
+
    proc {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
 GPort GState PlrState PlrPort Round NbTurn}
      if NbTurn == 0 then
-       PosPacman
-       PosGhost
-     in
        {SpawnAllPacman GUI PPort PState PSpawn GPort}
        {SpawnAllGhost GUI GPort GState GSpawn PPort}
        {SpawnAllPoint GUI Point PPort}
        {SpawnAllBonus GUI Bonus PPort}
        {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
     GPort GState PlrState PlrPort Round NbTurn+1}
-     end
+    elseif Round > (Input.nbPacman + Input.nbGhost) then
+      {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
+   GPort GState PlrState PlrPort 0 NbTurn+1}
+%%%%%%%%%% BEFORE NEW TURN => Check respawn %%%%%%%%%%%%%%
+    elseif Round == 0 then
+      NewPoint
+    in
+        if (NbTurn mod Input.respawnTimePoint) == 0 then
+          NewPoint = ListPointInMap
+          % TODO avoid spawn on ghost/pacman ?
+          {RespawnPoint GUI PPort NewPoint Point}
+        else
+          NewPoint = Point
+        end
+           %%%%%%%%%%%% TODO Check Point respawn %%%%%%%%%%%
+           %%%%%%%%%%%% TODO Check Bonus respawn %%%%%%%%%%%
+           %%%%%%%%%%%% TODO Check Player respawn %%%%%%%%%%%
+           {GameTurnByTurn GUI NewPoint Wall PSpawn GSpawn Bonus PPort PState
+        GPort GState PlrState PlrPort Round+1 NbTurn+1}
 %%%%%%%%%%%%%%%%%%%%% ROUND %%%%%%%%%%%%%%%%%%%%%%%%%
-      if Round > (Input.nbPacman + Input.nbGhost) then
-        {Delay 50}
-        {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-     GPort GState PlrState PlrPort 1 NbTurn+1}
-      else
+    else
         Port = {List.nth PlrPort Round}
         ID = {List.nth PlrState Round}
         Type = {GetType ID}
+        ActualScore
         NewPos
         X
-      in %%%To do is alive
-        %Maybe this function will be erase after teacher IA correction
-        % THANKS PETER ....
+        XX
+        Event
+        NewPoint
+      in
+        % TODO is alive
         {Send Port move(X NewPos)}
-        %%To do east to west if outbound but no wall ?
+        % TODO east to west if outbound but no wall ?
         if Type == 'Pacman' then
           {AlertPosPacman GPort ID NewPos}
           {Send GUI movePacman(ID NewPos)}
+          % TODO If ghost
 
-          %%% If point
-          %%%If bonus
-        else
+          Event = {List.nth {List.nth Input.map NewPos.y} NewPos.x}
+          if Event == 0 then % If point
+            if {IsInList Point NewPos} then
+              NewPoint = {RemoveToList Point NewPos}
+              {Send Port addPoint(Input.rewardPoint XX ActualScore)}
+              {Send GUI hidePoint(NewPos)}
+              {Send GUI scoreUpdate(ID ActualScore)}
+              {AlertHidePoint PPort NewPos}
+            else
+              NewPoint = Point
+            end
+          elseif Event == 4 then %TODO
+            NewPoint = Point
+          else
+            NewPoint = Point
+          end
+        elseif Type == 'Ghost' then
+          NewPoint = Point
           {AlertPosGhost PPort ID NewPos}
           {Send GUI moveGhost(ID NewPos)}
         end
         {Delay 50}
-        {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
+        {GameTurnByTurn GUI NewPoint Wall PSpawn GSpawn Bonus PPort PState
 GPort GState PlrState PlrPort Round+1 NbTurn}
       end
    end
@@ -358,6 +450,7 @@ GPort GState PlrState PlrPort Round+1 NbTurn}
       {InitMap WindowPort ListPointInMap ListBonusInMap}
       {InitPacman PacmanPort WindowPort ListSpawnPacmanInMap PacmanState}
       {InitGhost GhostPort WindowPort ListSpawnGhostInMap GhostState}
+
 %%%%%%%%%  Game launching %%%%%%%%%%%%%
       if Input.isTurnByTurn then
         {GameTurnByTurn WindowPort ListPointInMap ListWallInMap
