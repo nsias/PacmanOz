@@ -20,7 +20,6 @@ define
    ListSpawnGhostInMap
    ListSpawnPacmanInMap
    PacmanState
-   PosPlayer
    InitMap
    InitPacman
    GhostPort
@@ -195,8 +194,8 @@ in
      end
    end
 
-   fun {SpawnAllPacman GUI PPort PState PSpawn GPort}
-     case PPort of nil then nil
+   proc {SpawnAllPacman GUI PPort PState PSpawn GPort}
+     case PPort of nil then skip
      [] H|T then
        Count
        P
@@ -206,7 +205,7 @@ in
        ID = {List.nth PState Count}
        {Send GUI spawnPacman(ID P)}
        {AlertPosPacman GPort ID P}
-       P|{SpawnAllPacman GUI T PState PSpawn GPort}
+       {SpawnAllPacman GUI T PState PSpawn GPort}
      end
    end
 
@@ -218,8 +217,8 @@ in
      end
    end
 
-   fun {SpawnAllGhost GUI GPort GState GSpawn PPort}
-     case GPort of nil then nil
+   proc {SpawnAllGhost GUI GPort GState GSpawn PPort}
+     case GPort of nil then skip
      [] H|T then
        Count
        P
@@ -229,7 +228,7 @@ in
        ID = {List.nth GState Count}
        {Send GUI spawnGhost(ID P)}
        {AlertPosGhost PPort ID P}
-       P|{SpawnAllGhost GUI T GState GSpawn PPort}
+       {SpawnAllGhost GUI T GState GSpawn PPort}
      end
    end
 
@@ -274,50 +273,6 @@ in
      end
    end
 
-   fun {Move Player Port Wall InitPos}
-     fun {IsWrongMove Pos InitPos}
-       if Pos == InitPos
-       orelse Pos.x > InitPos.x+1
-       orelse Pos.x < InitPos.x-1
-       orelse Pos.y > InitPos.y+1
-       orelse Pos.y < InitPos.y-1 then true
-       else
-         false
-       end
-     end
-     fun {IsOutOfBound Pos}
-       if Pos.x < 1
-       orelse Pos.y < 1
-       orelse Pos.x > Input.nColumn-1
-       orelse Pos.y > Input.nRow-1 then true
-       else
-         false
-       end
-     end
-     fun {IsMovingToWall Pos Wall}
-       case Wall of nil then false
-       [] H|T then
-         if H == Pos then
-           true
-         else
-           {IsMovingToWall Pos T}
-         end
-       end
-     end
-     ID
-     Pos
-   in
-     {Send Port move(ID Pos)}
-     if {IsWrongMove Pos InitPos}
-     orelse {IsOutOfBound Pos}
-     orelse {IsMovingToWall Pos Wall} then
-       {Browser.browse 'WRONG'}
-       {Move Player Port Wall InitPos}
-     else
-       Pos
-     end
-   end
-
    fun {UpdateList List NewElement NewNth}
      fun {UpdatingList List NewElement NewNth Count}
        case List of nil then nil
@@ -333,36 +288,32 @@ in
      {UpdatingList List NewElement NewNth 1}
    end
    proc {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-GPort GState PlrState PlrPort PosPlayer Round NbTurn}
+GPort GState PlrState PlrPort Round NbTurn}
      if NbTurn == 0 then
        PosPacman
        PosGhost
      in
-       PosPacman = {SpawnAllPacman GUI PPort PState PSpawn GPort}
-       PosGhost = {SpawnAllGhost GUI GPort GState GSpawn PPort}
+       {SpawnAllPacman GUI PPort PState PSpawn GPort}
+       {SpawnAllGhost GUI GPort GState GSpawn PPort}
        {SpawnAllPoint GUI Point PPort}
        {SpawnAllBonus GUI Bonus PPort}
-       PosPlayer = {CreateOrder PosPacman PosGhost}
        {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-    GPort GState PlrState PlrPort PosPlayer Round NbTurn+1}
+    GPort GState PlrState PlrPort Round NbTurn+1}
      end
 %%%%%%%%%%%%%%%%%%%%% ROUND %%%%%%%%%%%%%%%%%%%%%%%%%
       if Round > (Input.nbPacman + Input.nbGhost) then
         {Delay 50}
         {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-     GPort GState PlrState PlrPort PosPlayer 1 NbTurn+1}
+     GPort GState PlrState PlrPort 1 NbTurn+1}
       else
         Port = {List.nth PlrPort Round}
         ID = {List.nth PlrState Round}
         Type = {GetType ID}
-        LastPos = {List.nth PosPlayer Round}
         NewPos
-        NewPosPlayer
         X
       in %%%To do is alive
         %Maybe this function will be erase after teacher IA correction
         % THANKS PETER ....
-        %NewPos = {Move ID Port Wall LastPos}
         {Send Port move(X NewPos)}
         %%To do east to west if outbound but no wall ?
         if Type == 'Pacman' then
@@ -375,10 +326,9 @@ GPort GState PlrState PlrPort PosPlayer Round NbTurn}
           {AlertPosGhost PPort ID NewPos}
           {Send GUI moveGhost(ID NewPos)}
         end
-        NewPosPlayer = {UpdateList PosPlayer NewPos Round}
         {Delay 50}
         {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-GPort GState PlrState PlrPort NewPosPlayer Round+1 NbTurn}
+GPort GState PlrState PlrPort Round+1 NbTurn}
       end
    end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -412,7 +362,7 @@ GPort GState PlrState PlrPort NewPosPlayer Round+1 NbTurn}
       if Input.isTurnByTurn then
         {GameTurnByTurn WindowPort ListPointInMap ListWallInMap
 ListSpawnPacmanInMap ListSpawnGhostInMap ListBonusInMap PacmanPort PacmanState
-GhostPort GhostState PlayerState PlayerPort PosPlayer 1 0}
+GhostPort GhostState PlayerState PlayerPort 1 0}
       end
    end
 end
