@@ -14,7 +14,6 @@ define
    InitPacmanState
    ListBonusInMap
    ListPointInMap
-   ListWallInMap
    ListSpawnGhostInMap
    ListSpawnPacmanInMap
    PacmanState
@@ -27,7 +26,10 @@ define
    InitGhost
    PlayerState
    PlayerPort
+   PlayerPos
+   PlayerDead
    CreateOrder
+   CreateDeathList
 
    GameTurnByTurn
    SpawnAllPacman
@@ -35,6 +37,7 @@ define
    SpawnAllGhost
    AlertPosGhost
    AlertPosPoint
+   AlertDeathPacman
    SpawnAllPoint
    AlertPosBonus
    SpawnAllBonus
@@ -45,7 +48,12 @@ define
    UpdateList
    RespawnPoint
    CreateMissingList
+   MeetSomeone
+   MeetGhost
+   MeetPacman
+   IsDead
 
+   PlrSpawn
 
 in
 %%%%%%%%%%%% Create Pacman %%%%%%%%%%%%%
@@ -197,8 +205,8 @@ in
      end
    end
 
-   proc {SpawnAllPacman GUI PPort PState PSpawn GPort}
-     case PPort of nil then skip
+   fun {SpawnAllPacman GUI PPort PState PSpawn GPort}
+     case PPort of nil then nil
      [] H|T then
        Count
        P
@@ -208,7 +216,7 @@ in
        ID = {List.nth PState Count}
        {Send GUI spawnPacman(ID P)}
        {AlertPosPacman GPort ID P}
-       {SpawnAllPacman GUI T PState PSpawn GPort}
+       P|{SpawnAllPacman GUI T PState PSpawn GPort}
      end
    end
 
@@ -220,8 +228,8 @@ in
      end
    end
 
-   proc {SpawnAllGhost GUI GPort GState GSpawn PPort}
-     case GPort of nil then skip
+   fun {SpawnAllGhost GUI GPort GState GSpawn PPort}
+     case GPort of nil then nil
      [] H|T then
        Count
        P
@@ -231,7 +239,7 @@ in
        ID = {List.nth GState Count}
        {Send GUI spawnGhost(ID P)}
        {AlertPosGhost PPort ID P}
-       {SpawnAllGhost GUI T GState GSpawn PPort}
+       P|{SpawnAllGhost GUI T GState GSpawn PPort}
      end
    end
 
@@ -280,8 +288,8 @@ in
      fun {UpdatingList List NewElement NewNth Count}
        case List of nil then nil
        [] H|T then
-         if Count == newNth then
-           newElement|{UpdatingList T NewElement NewNth Count+1}
+         if NewNth == Count then
+           NewElement|{UpdatingList T NewElement NewNth Count+1}
          else
            H|{UpdatingList T NewElement NewNth Count+1}
          end
@@ -349,18 +357,117 @@ in
    end
 
 
-   proc {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-GPort GState PlrState PlrPort Round NbTurn}
+   fun {IsDead PlrDead N}
+     fun {CheckDead PlrDead N Count}
+      case PlrDead of nil then false
+      [] H|T then
+        if N == Count then
+          if H == 1 then true
+          else false
+          end
+        else
+           {CheckDead T N Count+1}
+         end
+      end
+     end
+    in
+      {CheckDead PlrDead N 1}
+   end
+
+   fun {MeetSomeone PosPlayer Pos Count}
+     case PosPlayer of nil then 0
+     [] H|T then
+       if H == Pos then Count
+       else
+         {MeetSomeone T Pos Count+1}
+       end
+     end
+   end
+
+   fun {MeetGhost PlrState PosPlayer PlrDead Pos}
+     N = {MeetSomeone PosPlayer Pos 1}
+     State
+   in
+     if N == 0 then 0
+     elseif {IsDead PlrDead N} then 0
+     else
+       State = {List.nth PlrState N}
+       case {Record.label State} of ghost then N
+       [] pacman then 0
+       end
+     end
+   end
+
+   fun {MeetPacman PlrState PosPlayer PlrDead Pos}
+     N = {MeetSomeone PosPlayer Pos 1}
+     State
+   in
+     if N == 0 then 0
+     elseif {IsDead PlrDead N} then 0
+     else
+       State = {List.nth PlrState N}
+       case {Record.label State} of ghost then 0
+       [] pacman then N
+       end
+     end
+   end
+
+   proc {AlertDeathPacman GPort ID}
+     case GPort of nil then skip
+     [] H|T then
+       {Send H deathPacman(ID)}
+     end
+   end
+
+   fun {CreateDeathList PlrState}
+     case PlrState of nil then nil
+     [] H|T then
+       0|{CreateDeathList T}
+     end
+   end
+
+   fun {GetNthToList L Value}
+     fun {GetNth L Value Count}
+     case L of nil then nil
+     [] H|T then
+       if H == Value then
+         Count|{GetNth T Value Count+1}
+       else
+         {GetNth T Value Count+1}
+       end
+      end
+     end
+   in
+     {GetNth L Value 1}
+   end
+
+   fun {GetToList L1 N}
+     case N of nil then nil
+     [] H|T then
+        {List.nth L1 H}|{GetToList L1 T}
+     end
+   end
+
+
+
+   proc {GameTurnByTurn GUI Point PSpawn GSpawn Bonus PPort PState
+GPort GState PlrState PlrPort PosPlayer PlrDead Round NbTurn}
      if NbTurn == 0 then
-       {SpawnAllPacman GUI PPort PState PSpawn GPort}
-       {SpawnAllGhost GUI GPort GState GSpawn PPort}
+       PosPacman
+       PosGhost
+     in
+       PosPacman = {SpawnAllPacman GUI PPort PState PSpawn GPort}
+       PosGhost = {SpawnAllGhost GUI GPort GState GSpawn PPort}
        {SpawnAllPoint GUI Point PPort}
        {SpawnAllBonus GUI Bonus PPort}
-       {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-    GPort GState PlrState PlrPort Round NbTurn+1}
+       PlrDead = {CreateDeathList PlrState}
+       PosPlayer = {CreateOrder PosPacman PosGhost}
+       PlrSpawn = PosPlayer
+       {GameTurnByTurn GUI Point PSpawn GSpawn Bonus PPort PState
+    GPort GState PlrState PlrPort PosPlayer PlrDead Round NbTurn+1}
     elseif Round > (Input.nbPacman + Input.nbGhost) then
-      {GameTurnByTurn GUI Point Wall PSpawn GSpawn Bonus PPort PState
-   GPort GState PlrState PlrPort 0 NbTurn+1}
+      {GameTurnByTurn GUI Point PSpawn GSpawn Bonus PPort PState
+   GPort GState PlrState PlrPort PosPlayer PlrDead 0 NbTurn+1}
 %%%%%%%%%% BEFORE NEW TURN => Check respawn %%%%%%%%%%%%%%
     elseif Round == 0 then
       NewPoint
@@ -372,55 +479,106 @@ GPort GState PlrState PlrPort Round NbTurn}
         else
           NewPoint = Point
         end
-           %%%%%%%%%%%% TODO Check Point respawn %%%%%%%%%%%
            %%%%%%%%%%%% TODO Check Bonus respawn %%%%%%%%%%%
            %%%%%%%%%%%% TODO Check Player respawn %%%%%%%%%%%
-           {GameTurnByTurn GUI NewPoint Wall PSpawn GSpawn Bonus PPort PState
-        GPort GState PlrState PlrPort Round+1 NbTurn+1}
+           {Delay 100}
+           {GameTurnByTurn GUI NewPoint PSpawn GSpawn Bonus PPort PState
+        GPort GState PlrState PlrPort PosPlayer PlrDead Round+1 NbTurn+1}
 %%%%%%%%%%%%%%%%%%%%% ROUND %%%%%%%%%%%%%%%%%%%%%%%%%
     else
         Port = {List.nth PlrPort Round}
         ID = {List.nth PlrState Round}
         Type = {GetType ID}
-        ActualScore
         NewPos
-        X
+        IsAlive
         XX
+        Meet
         Event
         NewPoint
+        NewPosPlayer
+        NewPlrDead
       in
-        % TODO is alive
-        {Send Port move(X NewPos)}
-        % TODO east to west if outbound but no wall ?
-        if Type == 'Pacman' then
-          {AlertPosPacman GPort ID NewPos}
-          {Send GUI movePacman(ID NewPos)}
-          % TODO If ghost
-
-          Event = {List.nth {List.nth Input.map NewPos.y} NewPos.x}
-          if Event == 0 then % If point
-            if {IsInList Point NewPos} then
-              NewPoint = {RemoveToList Point NewPos}
-              {Send Port addPoint(Input.rewardPoint XX ActualScore)}
-              {Send GUI hidePoint(NewPos)}
+        {Send Port move(IsAlive NewPos)}
+        if IsAlive == 'null' then
+          {GameTurnByTurn GUI Point PSpawn GSpawn Bonus PPort PState
+       GPort GState PlrState PlrPort PosPlayer PlrDead Round+1 NbTurn+1}
+        else
+          if Type == 'Pacman' then
+            {AlertPosPacman GPort ID NewPos}
+            {Send GUI movePacman(ID NewPos)}
+            Meet = {MeetGhost PlrState PosPlayer PlrDead NewPos}
+            % TODO check if ghost is dead or not in MeetSomeone function
+            if  Meet > 0 then
+              GhostID = {List.nth PlrState Meet}
+              GhostPort = {List.nth PlrPort Meet}
+              ActualScore
+              NewLife
+              Z
+            in
+              {Browser.browse 'KILLLLLLLLLLED'}
+              {Delay 5000}
+              {Send Port gotKilled(Z NewLife ActualScore)}
               {Send GUI scoreUpdate(ID ActualScore)}
-              {AlertHidePoint PPort NewPos}
-            else
+              {Send GUI lifeUpdate(ID NewLife)}
+              {Send GhostPort killPacman(ID)}
+              {Send GUI hidePacman(ID)}
+              {AlertDeathPacman GPort ID}
               NewPoint = Point
+              NewPlrDead = {UpdateList PlrDead 1 Round}
+            else
+              NewPlrDead = PlrDead
+              Event = {List.nth {List.nth Input.map NewPos.y} NewPos.x}
+              if Event == 0 then % IF POINT
+                if {IsInList Point NewPos} then
+                  ActualScore
+                in
+                  NewPoint = {RemoveToList Point NewPos}
+                  {Send Port addPoint(Input.rewardPoint XX ActualScore)}
+                  {Send GUI hidePoint(NewPos)}
+                  {Send GUI scoreUpdate(ID ActualScore)}
+                  {AlertHidePoint PPort NewPos}
+                else
+                  NewPoint = Point
+                end
+              elseif Event == 4 then %TODO IF BONUS
+                NewPoint = Point
+              else
+                NewPoint = Point
+              end
             end
-          elseif Event == 4 then %TODO
+          elseif Type == 'Ghost' then
+            Meet
+          in
             NewPoint = Point
-          else
-            NewPoint = Point
+            {AlertPosGhost PPort ID NewPos}
+            {Send GUI moveGhost(ID NewPos)}
+            Meet = {MeetPacman PlrState PosPlayer PlrDead NewPos}
+            if Meet > 0 then
+              PacmanID = {List.nth PlrState Meet}
+              PacmanPort = {List.nth PlrPort Meet}
+              ActualScore
+              NewLife
+              Z
+            in
+              {Browser.browse 'KILLLLLLLLLL'}
+              {Delay 5000}
+              {Send PacmanPort gotKilled(Z NewLife ActualScore)}
+              {Send GUI scoreUpdate(PacmanID ActualScore)}
+              {Send GUI lifeUpdate(PacmanID NewLife)}
+              {Send Port killPacman(PacmanID)}
+              {Send GUI hidePacman(PacmanID)}
+              {AlertDeathPacman GPort PacmanID}
+              NewPlrDead = {UpdateList PlrDead 1 Meet}
+            else
+              NewPlrDead = PlrDead
+            end
           end
-        elseif Type == 'Ghost' then
-          NewPoint = Point
-          {AlertPosGhost PPort ID NewPos}
-          {Send GUI moveGhost(ID NewPos)}
+          NewPosPlayer = {UpdateList PosPlayer NewPos Round}
+          {Browser.browse NewPlrDead}
+          {Delay 200}
+          {GameTurnByTurn GUI NewPoint PSpawn GSpawn Bonus PPort PState
+GPort GState PlrState PlrPort NewPosPlayer NewPlrDead Round+1 NbTurn}
         end
-        {Delay 50}
-        {GameTurnByTurn GUI NewPoint Wall PSpawn GSpawn Bonus PPort PState
-GPort GState PlrState PlrPort Round+1 NbTurn}
       end
    end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,7 +594,6 @@ GPort GState PlrState PlrPort Round+1 NbTurn}
 %%%%%%%%%  Game initialisaton %%%%%%%%%%%%%
       %%%%% Utilitary value initialisation %%%%%
       ListPointInMap = {ListPoint Input.map 0}
-      ListWallInMap = {ListPoint Input.map 1}
       ListSpawnPacmanInMap = {ListPoint Input.map 2}
       ListSpawnGhostInMap = {ListPoint Input.map 3}
       ListBonusInMap = {ListPoint Input.map 4}
@@ -453,9 +610,9 @@ GPort GState PlrState PlrPort Round+1 NbTurn}
 
 %%%%%%%%%  Game launching %%%%%%%%%%%%%
       if Input.isTurnByTurn then
-        {GameTurnByTurn WindowPort ListPointInMap ListWallInMap
+        {GameTurnByTurn WindowPort ListPointInMap
 ListSpawnPacmanInMap ListSpawnGhostInMap ListBonusInMap PacmanPort PacmanState
-GhostPort GhostState PlayerState PlayerPort 1 0}
+GhostPort GhostState PlayerState PlayerPort PlayerPos PlayerDead 1 0}
       end
    end
 end
