@@ -84,6 +84,8 @@ in
      end
   end
 
+  %%%%%%%%% MESSAGES FUNCTIONS %%%%%%%%%%%%%%%%%%%%%
+
   fun{AssignSpawn P State}
     {UpdateState State [spawn#P]}
   end
@@ -105,6 +107,28 @@ in
     end
   end
 
+  
+  fun{GotKilled State ID NewLife NewSCore}
+     NewState NewScore in
+     NewState = {UpdateState State [alive#false score#(State.score - input.penalityKill) lives#(State.lives - 1)]}
+     ID = NewState.id
+     NewLife = NewState.lives
+     NewScore = NewState.score
+     NewState
+  end
+
+  fun{GhostPos ID P State}
+     NewState
+     NewTab
+  in
+     NewTab = {ModTab State.ghostPos ID P}
+     NewState = {UpdateState State [ghostPos#NewTab]}
+     NewState
+  end
+
+
+  %%%%%%%%%%%% MOVE FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%ù
+
   fun{Move State ID P}
     if State.alive == false then
         ID = 'null'
@@ -125,7 +149,8 @@ in
 
 
   fun{NextPosition X Y L Mode}
-    Choices
+     Choices
+     C1 C2 C3
      GhostID
      GhostPos
      Prefs
@@ -139,42 +164,44 @@ in
      {FindCloser X Y L GhostPos GhostID}
      Prefs = {Pref X Y GhostPos.x GhostPos.y Mode}
      
-    if Y == 1 then {Check X input.nRow Choices}
-    else {Check X Y-1 Choices} end
-    {Check X (Y+1 mod input.nRow) Choices}
-    if X == 1 then {Check input.nColumn Y Choices}
-    else {Check X-1 Y Choices} end
-    {Check (X+1 mod input.nColumn) Y Choices}
-    Choices = nil
+     C1 = {Check (X+1 mod Input.nColumn) Y nil}
+     if X == 1 then C2 = {Check Input.nColumn Y C1} 
+     else C2 = {Check X-1 Y C1} end
+     C3  = {Check X (Y+1 mod Input.nRow) C2}
+     if Y == 1 then Choices = {Check X Input.nRow C3}
+     else Choices = {Check X Y-1 C3} end
 
     {Available Choices Prefs}
   end
 
 
   proc{FindCloser X Y L GhostPos GhostID}
-     fun{FindCloserAcc X Y L minDist minID I}
+     fun{FindCloserAcc X Y L MinDist MinID I} 
 	fun{Dist X1 Y1 X2 Y2}
 	   (X1-X2)*(X1-X2) + (Y1-Y2)*(Y1-Y2)
 	end
      in
 	case L of H|T then D in
-	   D = {Dist X Y H.x H.y}
-	   if minDist = 'null' then {FindCloserAcc X Y T D I I+1}
-	   elseif D < minDist then {FindCloserAcc X Y T D I I+1}
-	   else {FindCloserAcc X Y T minDist minID I+1} end
-	[] nil then minID
-	end
+	   if H == 'null' then {FindCloserAcc X Y T MinDist MinID I+1}
+	   else
+	      D = {Dist X Y H.x H.y}
+	      if MinDist == 'null' then {FindCloserAcc X Y T D I I+1} 
+	      elseif D < MinDist then {FindCloserAcc X Y T D I I+1}
+	      else {FindCloserAcc X Y T MinDist MinID I+1} end
+	   end
+	[] nil then MinID
+	  end
      end
   in
      GhostID = {FindCloserAcc X Y L 'null' 1 1}
      GhostPos = {Nth L GhostID}
   end
 
-  proc{Check X Y Choices}
+  fun{Check X Y L}
     Val in
-    Val = {Nth {Nth input.map Y} X}
-    if Val == 1 then Choices = 'null'|_
-    else Choices = pt(x:X y:Y)|_ end
+    Val = {Nth {Nth Input.map Y} X}
+    if Val == 1 then 'null'|L
+    else pt(x:X y:Y)|L end
   end
 
   fun{Pref X1 Y1 X2 Y2 Mode}
@@ -200,49 +227,8 @@ in
      {QuickSort [NordDist#1 SudDist#2 WestDist#3 EastDist#4] Mode}
   end
 
-  fun{GotKilled State ID NewLife NewSCore}
-     NewState NewScore in
-     NewState = {UpdateState State [alive#false score#(State.score - input.penalityKill) lives#(State.lives - 1)]}
-     ID = NewState.id
-     NewLife = NewState.lives
-     NewScore = NewState.score
-     NewState
-  end
 
-  fun{GhostPos ID P State}
-     NewState
-     NewTab
-  in
-     NewTab = {ModTab State.ghostPos ID P}
-     NewState = {UpdateState State [ghostPos#NewTab]}
-     NewState
-  end
-  
-
- %%%%%%%%%%%%%%%%%%% FONCTIONS UTILITAIRES %%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-  fun{UpdateState State L}
-    {AdjoinList State L}
-  end
-
-  fun{CreateTab Val N}
-     if N > 0 then Val|{CreateTab Val N-1}
-     else nil end
-  end
-
-  fun{ModTab Tab N Val}
-     fun{ModTabAcc Tab N Val I}
-	case Tab of H|T then
-	   if I==N then Val|T
-	   else H|{ModTabAcc T N Val I+1} end
-	[] nil then nil
-	end
-     end
-  in
-     {ModTabAcc Tab N Val 1}
-  end
-
-  fun{QuickSort L Mode}
+   fun{QuickSort L Mode}
      proc {Partition1 L (D1#N1) L1 L2}
 	case L of (D2#N2)|M then
 	   if D2 > D1 then M1 in
@@ -273,13 +259,37 @@ in
      end
   in
      case L of (D#N)|M then L1 L2 S1 S2 in
-	if Mode = 'classic' then {Partition1 M (D#N) L1 L2}
+	if Mode == 'classic' then {Partition1 M (D#N) L1 L2}
 	else {Partition2 M (D#N) L1 L2} end
-	S1 = {QuickSort L1}
-	S2 = {QuickSort L2}
+	S1 = {QuickSort L1 Mode}
+	S2 = {QuickSort L2 Mode}
 	{Append S1 (D#N)|S2}
      [] nil then nil
      end
+  end
+
+
+ %%%%%%%%%%%%%%%%%%% FONCTIONS UTILITAIRES %%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  fun{UpdateState State L}
+    {AdjoinList State L}
+  end
+
+  fun{CreateTab Val N}
+     if N > 0 then Val|{CreateTab Val N-1}
+     else nil end
+  end
+
+  fun{ModTab Tab N Val}
+     fun{ModTabAcc Tab N Val I}
+	case Tab of H|T then
+	   if I==N then Val|T
+	   else H|{ModTabAcc T N Val I+1} end
+	[] nil then nil
+	end
+     end
+  in
+     {ModTabAcc Tab N Val 1}
   end
     
 end
