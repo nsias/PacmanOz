@@ -26,11 +26,11 @@ in
    fun{StartPlayer ID}
       Stream Port
       State
-      PacState
+      PacInit
    in
       {NewPort Stream Port}
-      pacInit = {CreateTab 'null' Input.nbPacman}
-      State = playerGhost(id:ID spawn:_ pos:_ alive:false mode:'classic' pacPos:pacInit)
+      PacInit = {CreateTab 'null' Input.nbPacman}
+      State = playerGhost(id:ID spawn:_ pos:_ alive:false mode:'classic' pacPos:PacInit)
       thread
 	 {TreatStream Stream State}
       end
