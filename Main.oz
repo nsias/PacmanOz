@@ -45,6 +45,11 @@ define
    SpawnPacman
    GetDeathGhost
    SpawnGhost
+   CheckRespawnBonus
+   CheckRespawnGhost
+   CheckRespawnPoint
+   CheckRespawnPacman
+   LaunchTimerHunt
    %%%%% ENCOUNTER RESOLUTION %%%
    MeetOpponent
    Kill
@@ -52,6 +57,13 @@ define
    GameTurnByTurn
    IsEndGame
    GetWinner
+   %%%% SIMULTANEOUS %%%
+   Server
+   ServerStream
+   GameSimultaneous
+   TreatServer
+   PlayerAction
+
 in
 
   % TODO add additionnal function
@@ -338,8 +350,6 @@ in
       end
     end
   in
-  %TypeOpponent = {GetTypeOpponent ID}
-  %{Browser.browse 'TypeOpponent :'#TypeOpponent}
   {Meet State ID P 1}
   end
 
@@ -513,7 +523,7 @@ in
 
 
 
-%%%%%%%%%%%%% RESPAWN RESOLUTION %%%%%%%%%%%%%% TODO ALERT IN INIT  BONUS
+%%%%%%%%%%%%% RESPAWN RESOLUTION %%%%%%%%%%%%%%
   proc {SpawnPoint Point}
     case Point of nil then
       skip
@@ -706,7 +716,6 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
         IDWinner
       in
         IDWinner = {GetWinner NewState}
-        {Browser.browse NewState}
         {Send WindowPort displayWinner(IDWinner)}
       else
         {Delay 200}
@@ -755,8 +764,8 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
             NewPoint = {RemoveFromList Point PointRemoved}
           elseif GetBonus > 0 then
             BonusRemoved = {List.nth Bonus GetBonus}
-            {AlertSetMode 'hunt'}
           in
+            {AlertSetMode 'hunt'}
             NewPoint = Point
             {Send WindowPort hideBonus(P)}
             {AlertBonusRemoved P}
@@ -830,6 +839,230 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
     end
   end
 end
+%%%%%%%%%%%%%% SIMULTANEOUS GAME %%%%%%%%%%%%%%%%%%%%%
+proc {PlayerAction State}
+  Port = State.port
+  ID = State.id
+  IsDead = State.isDead
+  P
+  NewState
+  StateSent
+in
+  if IsDead == false then
+    {Send Port move(_ P)}
+    case P of 'null' then
+      StateSent = state(port:Port id:ID pos:P isDead:true)
+      {PlayerAction StateSent}
+    else
+      StateSent = state(port:Port id:ID pos:P isDead:IsDead)
+      {Send Server setNewState(StateSent NewState)}
+      {Wait NewState}
+      {PlayerAction NewState}
+    end
+  else
+    {PlayerAction State}
+  end
+end
+
+proc {CheckRespawnPoint}
+  {Delay Input.respawnTimePoint * 1000}
+  {Send Server respawnPoint()}
+  {CheckRespawnPoint}
+end
+
+proc {CheckRespawnBonus}
+  {Delay Input.respawnTimeBonus * 1000}
+  {Send Server respawnBonus()}
+  {CheckRespawnBonus}
+end
+
+proc {CheckRespawnPacman}
+  {Delay Input.respawnTimePacman * 1000}
+  {Send Server respawnPacman()}
+  {CheckRespawnPacman}
+end
+
+proc {CheckRespawnGhost}
+  {Delay Input.respawnTimeGhost * 1000}
+  {Send Server respawnGhost()}
+  {CheckRespawnGhost}
+end
+
+proc {LaunchTimerHunt}
+  {Delay Input.huntTime * 1000}
+  {Send Server stopHunt()}
+end
+
+proc {GameSimultaneous AllState Point Bonus Hunt}
+  proc {LaunchPlayer State}
+    case State of nil then
+      skip
+    [] H|T then
+      thread {PlayerAction H} end
+      {LaunchPlayer T}
+    end
+  end
+in
+  {Delay 1000}
+  {LaunchPlayer InitialPlayerState}
+  {NewPort ServerStream Server}
+  thread {TreatServer ServerStream AllState Point Bonus Hunt} end
+  thread {CheckRespawnBonus} end
+  thread {CheckRespawnPoint} end
+  thread {CheckRespawnPacman} end
+  thread {CheckRespawnGhost} end
+end
+
+proc {TreatServer Stream AllState Point Bonus Hunt}
+  StateToSend
+in
+  case Stream of nil then
+    skip
+  [] setNewState(State StateToSend)|T then
+    ID = State.id
+    Port = State.port
+    P = State.pos
+    NewHunt
+    NewBonus
+    NewPoint
+    NewState
+    NewAllState
+  in
+     case {Record.label ID} of 'pacman' then
+       EncounterGhost = {MeetOpponent AllState ID P}
+       GetPoint = {NthFromList Point P}
+       GetBonus = {NthFromList Bonus P}
+     in
+       {Send WindowPort movePacman(ID P)}
+       {AlertPosPacman ID P}
+       case EncounterGhost of nil then
+         if GetPoint > 0 then
+           PointRemoved = {List.nth Point GetPoint}
+           NewScore
+         in
+           NewBonus = Bonus
+           NewHunt = Hunt
+           {Send WindowPort hidePoint(P)}
+           {Send Port addPoint(Input.rewardPoint _ NewScore)}
+           {Send WindowPort scoreUpdate(ID NewScore)}
+           {AlertPointRemoved P}
+           NewPoint = {RemoveFromList Point PointRemoved}
+         elseif GetBonus > 0 then
+           BonusRemoved = {List.nth Bonus GetBonus}
+         in
+           NewPoint = Point
+           NewHunt = 1
+           NewBonus = {RemoveFromList Bonus BonusRemoved}
+           {Send WindowPort hideBonus(P)}
+           {AlertBonusRemoved P}
+           {AlertSetMode 'hunt'}
+           thread {LaunchTimerHunt} end
+         else
+            NewBonus = Bonus
+            NewPoint = Point
+            NewHunt = Hunt
+         end
+         NewState = [State]
+         StateToSend = State
+       [] H|T then
+         LengthListGhost = {List.length EncounterGhost}
+         Random = ({OS.rand} mod LengthListGhost) + 1
+         GetGhost = {List.nth EncounterGhost Random}
+         GhostState = {List.nth AllState GetGhost}
+         NewLife
+         NewScore
+       in
+         NewBonus = Bonus
+         NewPoint = Point
+         NewHunt = Hunt
+         if Hunt == 0 then
+           {Send WindowPort hidePacman(ID)}
+           {Send Port gotKilled(_ NewLife NewScore)}
+           {Send WindowPort scoreUpdate(ID NewScore)}
+           {Send WindowPort lifeUpdate(ID NewLife)}
+           {Send GhostState.port killPacman(ID)}
+           {AlertDeathPacman ID}
+           StateToSend = state(port:Port id:ID pos:P isDead:true)
+           NewState = [StateToSend]
+         else
+           NewState = {Kill State AllState EncounterGhost P}
+           StateToSend = State
+         end
+       end
+       NewAllState = {UpdateList AllState NewState}
+       {TreatServer T NewAllState NewPoint NewBonus NewHunt}
+     [] 'ghost' then
+       EncounterPacman = {MeetOpponent AllState ID P}
+     in
+       {Send WindowPort moveGhost(ID P)}
+       {AlertPosGhost ID P}
+       case EncounterPacman of nil then
+         NewState = [State]
+         StateToSend = State
+       [] H|T then
+         if Hunt == 0 then
+           NewState = {Kill State AllState EncounterPacman P}
+           StateToSend = State
+         else
+           LengthListPacman = {List.length EncounterPacman}
+           Random = ({OS.rand} mod LengthListPacman) + 1
+           GetPacman = {List.nth EncounterPacman Random}
+           PacmanState = {List.nth AllState GetPacman}
+           NewScore
+         in
+           {Send WindowPort hideGhost(ID)}
+           {Send Port gotKilled()}
+           {Send PacmanState.port killGhost(ID _ NewScore)}
+           {Send WindowPort scoreUpdate(PacmanState.id NewScore)}
+           StateToSend = state(port:Port id:ID pos:P isDead:true)
+           NewState = [State]
+         end
+       end
+       NewAllState = {UpdateList AllState NewState}
+       {TreatServer T NewAllState Point Bonus Hunt}
+     end
+
+  [] respawnPoint()|T then
+    PointRespawned = {GetMissingFromList AllPointInMap Point}
+  in
+    {SpawnPoint PointRespawned}
+    {TreatServer T AllState AllPointInMap Bonus Hunt}
+
+  [] respawnBonus()|T then
+    BonusRespawned = {GetMissingFromList AllBonusInMap Bonus}
+  in
+    {SpawnBonus BonusRespawned}
+    {TreatServer T AllState Point AllBonusInMap Hunt}
+
+  [] respawnPacman()|T then
+    DeathPacman = {GetDeathPacman AllState}
+    RevivedPacman
+    NewAllState
+  in
+    RevivedPacman = {SpawnPacman DeathPacman}
+    NewAllState = {UpdateList AllState RevivedPacman}
+    {TreatServer T NewAllState Point Bonus Hunt}
+
+  [] respawnGhost()|T then
+    DeathGhost = {GetDeathGhost AllState}
+    RevivedGhost
+    NewAllState
+  in
+    RevivedGhost = {SpawnGhost DeathGhost}
+    NewAllState = {UpdateList AllState RevivedGhost}
+    {TreatServer T NewAllState Point Bonus Hunt}
+  [] stopHunt()|T then
+    NewHunt
+  in
+    NewHunt = 'classic'
+    {AlertSetMode NewHunt}
+    {TreatServer T AllState Point Bonus NewHunt}
+  [] M|T then
+    {Browser.browse 'MESSAGE SERVER WTF'#M}
+    %{Delay 50000}
+    {TreatServer T AllState Point Bonus Hunt}
+  end
+end
 
    thread
       % Create port for window
@@ -850,6 +1083,8 @@ end
       {InitGame}
       if Input.isTurnByTurn then
         {GameTurnByTurn InitialPlayerState AllPointInMap AllBonusInMap 0 1 1}
+      else
+        {GameSimultaneous InitialPlayerState AllPointInMap AllBonusInMap 0}
       end
    end
 
