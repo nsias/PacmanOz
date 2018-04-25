@@ -34,15 +34,24 @@ define
    AlertPointRemoved
    AlertDeathPacman
    AlertPointSpawn
+   AlertBonusSpawn
+   AlertBonusRemoved
+   AlertDeathGhost
+   AlertSetMode
    %%%%% SPAWN RESOLUTION %%%
    SpawnPoint
+   SpawnBonus
    GetDeathPacman
    SpawnPacman
+   GetDeathGhost
+   SpawnGhost
    %%%%% ENCOUNTER RESOLUTION %%%
    MeetOpponent
    Kill
    %%%%% GAME %%%%%
    GameTurnByTurn
+   IsEndGame
+   GetWinner
 in
 
   % TODO add additionnal function
@@ -283,6 +292,7 @@ in
         [] H|T then
           {Send WindowPort initBonus(H)}
           {Send WindowPort spawnBonus(H)}
+          {AlertBonusSpawn H}
           {InitBonus T}
         end
       end
@@ -351,7 +361,11 @@ in
           {Send Killer.port killPacman(VictimID)}
           {AlertDeathPacman VictimID}
         [] 'ghost' then
-          {Browser.browse 'TODO HUNT MODE'}
+          {Send WindowPort hideGhost(VictimID)}
+          {Send VictimPort gotKilled()}
+          {Send Killer.port killGhost(VictimID _ NewScore)}
+          {Send WindowPort scoreUpdate(Killer.id NewScore)}
+          {AlertDeathGhost VictimID}
         end
         {Killing Killer AllState T}
       end
@@ -397,6 +411,7 @@ in
         skip
       [] H|T then
         {Send H pacmanPos(ID P)}
+        {Alert T ID P}
       end
     end
     in
@@ -409,6 +424,19 @@ in
         skip
       [] H|T then
         {Send H pointRemoved(P)}
+        {Alert T P}
+      end
+    end
+  in
+    {Alert AllPacmanPort P}
+  end
+
+  proc {AlertBonusRemoved P}
+    proc {Alert Port P}
+      case Port of nil then
+        skip
+      [] H|T then
+        {Send H bonusRemoved(P)}
         {Alert T P}
       end
     end
@@ -435,11 +463,54 @@ in
         skip
       [] H|T then
         {Send H pointSpawn(P)}
+        {Alert T P}
       end
     end
   in
     {Alert AllPacmanPort P}
   end
+
+  proc {AlertBonusSpawn P}
+    proc {Alert Port P}
+      case Port of nil then
+        skip
+      [] H|T then
+        {Send H bonusSpawn(P)}
+        {Alert T P}
+      end
+    end
+  in
+    {Alert AllPacmanPort P}
+  end
+
+  proc {AlertDeathGhost ID}
+    proc {Alert Port ID}
+      case Port of nil then
+        skip
+      [] H|T then
+        {Send H deathGhost(ID)}
+        {Alert T ID}
+      end
+    end
+  in
+    {Alert AllPacmanPort ID}
+  end
+
+  proc {AlertSetMode Hunt}
+    proc {Alert Port Hunt}
+      case Port of nil then
+        skip
+      [] H|T then
+        {Send H setMode(Hunt)}
+        {Alert T Hunt}
+      end
+    end
+  in
+    {Alert AllPacmanPort Hunt}
+    {Alert AllGhostPort Hunt}
+    {Send WindowPort setMode(Hunt)}
+  end
+
 
 
 %%%%%%%%%%%%% RESPAWN RESOLUTION %%%%%%%%%%%%%% TODO ALERT IN INIT  BONUS
@@ -450,6 +521,16 @@ in
       {Send WindowPort spawnPoint(H)}
       {AlertPointSpawn H}
       {SpawnPoint T}
+    end
+  end
+
+  proc {SpawnBonus Bonus}
+    case Bonus of nil then
+      skip
+    [] H|T then
+      {Send WindowPort spawnBonus(H)}
+      {AlertBonusSpawn H}
+      {SpawnBonus T}
     end
   end
 
@@ -488,13 +569,84 @@ in
     end
   end
 
+  fun {SpawnGhost State}
+    case State of nil then
+      nil
+    [] H|T then
+      P
+    in
+      {Send H.port spawn(_ P)}
+      {Send WindowPort spawnGhost(H.id P)}
+      {AlertPosGhost H.id P}
+      state(port:H.port id:H.id pos:P isDead:false)|{SpawnGhost T}
+    end
+  end
 
+  fun {GetDeathGhost State}
+    case State of nil then
+      nil
+    [] H|T then
+      ID = H.id
+    in
+      case {Record.label ID} of 'ghost' then
+        if H.isDead == true then
+          H|{GetDeathGhost T}
+        else
+          {GetDeathGhost T}
+        end
+      [] 'pacman' then
+        {GetDeathGhost T}
+      end
+    end
+  end
+
+  fun {IsEndGame State}
+    case State of nil then
+      true
+    [] H|T then
+      case {Record.label H.id} of 'ghost' then
+        {IsEndGame T}
+      [] 'pacman' then
+        if H.isDead == true then
+          {IsEndGame T}
+        else
+          false
+        end
+      end
+    end
+  end
+
+  fun {GetWinner State}
+    fun {CheckWinner State ID BestScore}
+      case State of nil then
+        ID
+      [] H|T then
+        case {Record.label H.id} of 'ghost' then
+          {CheckWinner T ID BestScore}
+        [] 'pacman' then
+          Score
+        in
+          {Send H.port addPoint(0 _ Score)}
+          if Score > BestScore then
+            {CheckWinner T H.id Score}
+          else
+            {CheckWinner T ID BestScore}
+          end
+        end
+      end
+    end
+    MinScore = ~(Input.nbLives * Input.penalityKill)
+  in
+    {CheckWinner State _ MinScore-1}
+  end
 %%%%%%%%%%%%% MAIN TURN BY TURN %%%%%%
-proc {GameTurnByTurn AllState Point Bonus Round Turn}
+proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
 %%%%%%% RESPAWN CHECK %%%%%%
   if Round == 0 then
     NewPoint
+    NewBonus
     NewState
+    NewHunt
   in
       if Turn mod Input.respawnTimePoint == 0 then
         PointRespawned = {GetMissingFromList AllPointInMap Point}
@@ -505,29 +657,64 @@ proc {GameTurnByTurn AllState Point Bonus Round Turn}
         NewPoint = Point
       end
       if Turn mod Input.respawnTimeBonus == 0 then
-        {Browser.browse 'TODO BONUS'}
+        BonusRespawned = {GetMissingFromList AllBonusInMap Bonus}
+      in
+        {SpawnBonus BonusRespawned}
+        NewBonus = AllBonusInMap
+      else
+        NewBonus = Bonus
       end
-      if Turn mod Input.respawnTimePacman == 0 then
+      if Turn mod Input.respawnTimePacman == 0 andthen
+        Turn mod Input.respawnTimeGhost == 0 then
+        DeathPacman
+        RevivedPacman
+        NewState1
+        DeathGhost
+        RevivedGhost
+      in
+        DeathPacman = {GetDeathPacman AllState}
+        RevivedPacman = {SpawnPacman DeathPacman}
+        NewState1 = {UpdateList AllState RevivedPacman}
+        DeathGhost = {GetDeathGhost AllState}
+        RevivedGhost = {SpawnGhost DeathGhost}
+        NewState = {UpdateList NewState1 RevivedGhost}
+      elseif Turn mod Input.respawnTimePacman == 0 then
         DeathPacman
         RevivedPacman
       in
         DeathPacman = {GetDeathPacman AllState}
         RevivedPacman = {SpawnPacman DeathPacman}
         NewState = {UpdateList AllState RevivedPacman}
-        {Browser.browse 'SPAAAWNNNNN'}
+      elseif Turn mod Input.respawnTimeGhost == 0 then
+        DeathGhost
+        RevivedGhost
+      in
+        DeathGhost = {GetDeathGhost AllState}
+        RevivedGhost = {SpawnGhost DeathGhost}
+        NewState = {UpdateList AllState RevivedGhost}
       else
         NewState = AllState
       end
-
-      if Turn mod Input.respawnTimeGhost == 0 then
-        {Browser.browse 'TODO BONUS'}
+      if Turn - Hunt == Input.huntTime then
+        NewHunt = 0
+        {AlertSetMode 'classic'}
+      else
+        NewHunt = Hunt
       end
-    {Delay 200}
-    {GameTurnByTurn NewState NewPoint Bonus Round+1 Turn}
+      if {IsEndGame NewState} andthen
+        Turn mod Input.respawnTimePacman == 0 then
+        IDWinner
+      in
+        IDWinner = {GetWinner NewState}
+        {Browser.browse NewState}
+        {Send WindowPort displayWinner(IDWinner)}
+      else
+        {Delay 200}
+      {GameTurnByTurn NewState NewPoint NewBonus NewHunt Round+1 Turn}
+      end
 %%%%%%% NEW TURN %%%%%%%%%%%%
   elseif Round > (Input.nbPacman + Input.nbGhost) then
-    {Delay 200}
-    {GameTurnByTurn AllState Point Bonus 0 Turn+1}
+    {GameTurnByTurn AllState Point Bonus Hunt 0 Turn+1}
 %%%%%%% ROUND %%%%%%%%%%%%%%
   else
     P
@@ -536,12 +723,14 @@ proc {GameTurnByTurn AllState Point Bonus Round Turn}
     in
     {Send Port move(_ P)}
     case P of 'null' then
-      {GameTurnByTurn AllState Point Bonus Round+1 Turn}
+      {GameTurnByTurn AllState Point Bonus Hunt Round+1 Turn}
     else
       ID = State.id
       NewState
       NewAllState
       NewPoint
+      NewBonus
+      NewHunt
     in
       case {Record.label ID} of pacman then
         EncounterGhost = {MeetOpponent AllState ID P}
@@ -550,21 +739,34 @@ proc {GameTurnByTurn AllState Point Bonus Round Turn}
       in
         {Send WindowPort movePacman(ID P)}
         {AlertPosPacman ID P}
-        %%%%% POINT %%%%%
-        if GetPoint > 0 then
-          PointRemoved = {List.nth Point GetPoint}
-          NewScore
-        in
-          {Send WindowPort hidePoint(P)}
-          {Send Port addPoint(Input.rewardPoint _ NewScore)}
-          {Send WindowPort scoreUpdate(ID NewScore)}
-          {AlertPointRemoved P}
-          NewPoint = {RemoveFromList Point PointRemoved}
-        else
-          NewPoint = Point
-        end
         %%%%% ENCOUNTER GHOST %%%%%
         case EncounterGhost of nil then
+          %%%%% POINT %%%%%
+          if GetPoint > 0 then
+            PointRemoved = {List.nth Point GetPoint}
+            NewScore
+          in
+            NewBonus = Bonus
+            NewHunt = Hunt
+            {Send WindowPort hidePoint(P)}
+            {Send Port addPoint(Input.rewardPoint _ NewScore)}
+            {Send WindowPort scoreUpdate(ID NewScore)}
+            {AlertPointRemoved P}
+            NewPoint = {RemoveFromList Point PointRemoved}
+          elseif GetBonus > 0 then
+            BonusRemoved = {List.nth Bonus GetBonus}
+            {AlertSetMode 'hunt'}
+          in
+            NewPoint = Point
+            {Send WindowPort hideBonus(P)}
+            {AlertBonusRemoved P}
+            NewBonus = {RemoveFromList Bonus BonusRemoved}
+            NewHunt = Turn
+          else
+            NewPoint = Point
+            NewBonus = Bonus
+            NewHunt = Hunt
+          end
           NewState = [state(port:Port id:ID pos:P isDead:false)]
         %%%%%% TO DO HUNT MODE %%%%
         [] H|T then
@@ -575,18 +777,27 @@ proc {GameTurnByTurn AllState Point Bonus Round Turn}
           NewLife
           NewScore
         in
-          {Send WindowPort hidePacman(ID)}
-          {Send Port gotKilled(_ NewLife NewScore)}
-          {Send WindowPort scoreUpdate(ID NewScore)}
-          {Send WindowPort lifeUpdate(ID NewLife)}
-          {Send GhostState.port killPacman(ID)}
-          {AlertDeathPacman ID}
-          NewState = [state(port:Port id:ID pos:P isDead:true)]
+          NewBonus = Bonus
+          NewHunt = Hunt
+          NewPoint = Point
+          if Hunt == 0 then
+            {Send WindowPort hidePacman(ID)}
+            {Send Port gotKilled(_ NewLife NewScore)}
+            {Send WindowPort scoreUpdate(ID NewScore)}
+            {Send WindowPort lifeUpdate(ID NewLife)}
+            {Send GhostState.port killPacman(ID)}
+            {AlertDeathPacman ID}
+            NewState = [state(port:Port id:ID pos:P isDead:true)]
+          else
+            NewState ={Kill State AllState EncounterGhost P}
+          end
         end
       [] ghost then
         EncounterPacman = {MeetOpponent AllState ID P}
       in
         NewPoint = Point
+        NewBonus = Bonus
+        NewHunt = Hunt
         {Send WindowPort moveGhost(ID P)}
         {AlertPosGhost ID P}
         %%%%% ENCOUNTER PACMAN %%%%%
@@ -594,17 +805,28 @@ proc {GameTurnByTurn AllState Point Bonus Round Turn}
           NewState = [state(port:Port id:ID pos:P isDead:false)]
           %%%%%% TO DO HUNT MODE %%%%
         [] H|T then
-          %NewState = [state(port:Port id:ID pos:P isDead:false)]
-          NewState = {Kill State AllState EncounterPacman P}
+          LengthListPacman = {List.length EncounterPacman}
+          Random  = ({OS.rand} mod LengthListPacman) + 1
+          GetPacman = {List.nth EncounterPacman Random}
+          PacmanState = {List.nth AllState GetPacman}
+          NewScore
+        in
+          if Hunt == 0 then
+            NewState = {Kill State AllState EncounterPacman P}
+          else
+            {Send WindowPort hideGhost(ID)}
+            {Send Port gotKilled()}
+            {Send PacmanState.port killGhost(ID _ NewScore)}
+            {Send WindowPort scoreUpdate(PacmanState.id NewScore)}
+            NewState = [state(port:Port id:ID pos:P isDead:true)]
+          end
         end
       end
 
       %case NewAllState of _ then
       NewAllState = {UpdateList AllState NewState}
       %end
-      {Browser.browse NewAllState}
-      {Delay 200}
-      {GameTurnByTurn NewAllState NewPoint Bonus Round+1 Turn}
+      {GameTurnByTurn NewAllState NewPoint NewBonus NewHunt Round+1 Turn}
     end
   end
 end
@@ -627,10 +849,11 @@ end
       InitialPlayerState = {NewPlayerState}
       {InitGame}
       if Input.isTurnByTurn then
-        {GameTurnByTurn InitialPlayerState AllPointInMap AllBonusInMap 1 1}
+        {GameTurnByTurn InitialPlayerState AllPointInMap AllBonusInMap 0 1 1}
       end
    end
 
 end
-%TODO Kill before getPoint/getBonus
-%TODO Spawnkill : if spawned, kill instantly
+%TODO Spawn point/bonus : if spawned, get it => Refactoring point + bonus
+%TODO Spawnkill : if spawned, kill instantly => Refactoring again
+%TODO : Plusieurs pacmans sur le même spawn idem ghost
