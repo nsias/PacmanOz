@@ -3,10 +3,11 @@ import
    QTk at 'x-oz://system/wp/QTk.ozf'
    Input
    Browser
+   OS
 export
    portWindow:StartWindow
 define
-   
+
    StartWindow
    TreatStream
 
@@ -19,7 +20,7 @@ define
    SpawnGhost
    SpawnBonus
    SpawnPoint
-   
+
    MovePacman
    MoveGhost
 
@@ -27,19 +28,19 @@ define
    HideGhost
    HideBonus
    HidePoint
-   
+
    UpdateScore
    UpdateLife
-   
+
    ChangeMode
 
    BuildWindow
-   
+   Url = {OS.getCWD}
+   ImgWall={QTk.newImage photo(url:Url#"/images/wall.gif")}
    Squares
    DrawMap
 
    StateModification
-
 in
 
 %%%%% Build the initial window and set it up (call only once)
@@ -51,7 +52,7 @@ in
       DescLife=grid(handle:GridLife height:100 width:50*Input.nbPacman)
       DescScore=grid(handle:GridScore height:100 width:50*Input.nbPacman)
       Window={QTk.build td(Toolbar Desc DescLife DescScore)}
-  
+
       {Window show}
 
       % configure rows and set headers
@@ -76,21 +77,21 @@ in
       for N in 1..(Input.nbPacman) do
 	 {GridScore columnconfigure(N+1 minsize:50 weight:0 pad:5)}
       end
-      
+
       {DrawMap Grid}
-      
+
       handle(grid:Grid life:GridLife score:GridScore)
    end
 
-   
+
 %%%%% Squares of path and wall
-   Squares = square(0:label(text:"" width:1 height:1 bg:c(0 0 204))
-		    1:label(text:"" borderwidth:5 relief:raised width:1 height:1 bg:c(0 0 0))
-		    2:label(text:"" width:1 height:1 bg:c(0 0 150))
-		    3:label(text:"" width:1 height:1 bg:c(0 0 255))
-		    4:label(text:"" width:1 height:1 bg:c(0 150 150))
+   Squares = square(0:label(text:"" width:1 height:1 bg:c(255 255 255))
+		    1:label(text:"" width:25 height:25 bg:c(0 0 0) image:ImgWall)
+		    2:label(text:"SpawnP" width:1 height:1 bg:white)
+		    3:label(text:"SpawnG" width:1 height:1 bg:white)
+		    4:label(text:"" width:1 height:1 bg:c(255 0 0))
 		   )
-   
+
 %%%%% Function to draw the map
    proc{DrawMap Grid}
       proc{DrawColumn Column M N}
@@ -116,9 +117,11 @@ in
 %%%%% Init the pacman & ghost
    fun{InitPacman Grid ID}
       Handle HandleLife HandleScore Id Color LabelPacman LabelLife LabelScore
+      URL = {OS.getCWD}
+      ImgPacman={QTk.newImage photo(url:URL#"/images/pacman.gif")}
    in
       pacman(id:Id color:Color name:_) = ID
-      LabelPacman = label(text:"P" handle:Handle borderwidth:5 relief:raised bg:Color ipadx:5 ipady:5)
+      LabelPacman = label(handle:Handle width:25 height:25 bg:Color image:ImgPacman)
       LabelLife = label(text:Input.nbLives borderwidth:5 handle:HandleLife relief:solid bg:Color ipadx:5 ipady:5)
       LabelScore = label(text:0 borderwidth:5 handle:HandleScore relief:solid bg:Color ipadx:5 ipady:5)
       {Grid.grid configure(LabelPacman row:0 column:0 sticky:wesn)}
@@ -130,7 +133,7 @@ in
       guiPacman(id:ID life:HandleLife score:HandleScore pacman:Handle)
    end
 
-   
+
    fun{SpawnPacman Position}
       fun{$ Grid State}
 	 {Grid.grid configure(State.pacman row:Position.y column:Position.x sticky:wesn)}
@@ -149,17 +152,19 @@ in
 	 State
       end
    end
-   
+
    fun{InitGhost Grid ID}
       Handle Color LabelGhost
+      URL = {OS.getCWD}
+      ImgGhost={QTk.newImage photo(url:URL#"/images/ghost.gif")}
    in
       ghost(id:_ color:Color name:_) = ID
-      LabelGhost = label(text:"G" handle:Handle borderwidth:5 relief:raised bg:Color ipadx:5 ipady:5)
+      LabelGhost = label(handle:Handle width:25 height:25 bg:Color image:ImgGhost)
       {Grid.grid configure(LabelGhost row:0 column:0 sticky:wesn)}
       {Grid.grid remove(Handle)}
       guiGhost(id:ID ghost:Handle color:Color)
    end
-   
+
    fun{SpawnGhost Position}
       fun{$ Grid State}
 	 {Grid.grid configure(State.ghost row:Position.y column:Position.x sticky:wesn)}
@@ -185,7 +190,7 @@ in
 	 State
       end
    end
-   
+
    fun{UpdateScore Score}
       fun{$ Grid State}
 	 {State.score set(Score)}
@@ -195,8 +200,10 @@ in
 
    fun{InitBonus Grid Position}
       Handle Label
+      URL = {OS.getCWD}
+      ImgBonus={QTk.newImage photo(url:URL#"/images/bonus.gif")}
    in
-      Label = label(text:"" height:1 width:1 handle:Handle bg:red)
+      Label = label(text:"" height:15 width:15 handle:Handle bg:red image:ImgBonus)
       {Grid.grid configure(Label row:0 column:0)}
       {Grid.grid remove(Handle)}
       guiBonus(position:Position bonus:Handle)
@@ -217,8 +224,10 @@ in
 
    fun{InitPoint Grid Position}
       Handle Label
+      URL = {OS.getCWD}
+      ImgPoint={QTk.newImage photo(url:URL#"/images/point.gif")}
    in
-      Label = label(text:"" height:1 width:1 handle:Handle bg:white)
+      Label = label(text:"" height:15 width:15 handle:Handle bg:white image:ImgPoint)
       {Grid.grid configure(Label row:0 column:0)}
       {Grid.grid remove(Handle)}
       guiPoint(position:Position point:Handle)
@@ -243,14 +252,20 @@ in
       [] guiGhost(id:_ ghost:Handle color:Color)|Next then
 	 case M
 	 of classic then
-	    {Handle set(bg:Color)}
+     URL = {OS.getCWD}
+     ImgGhost={QTk.newImage photo(url:URL#"/images/ghost.gif")}
+   in
+	    {Handle set(bg:Color image:ImgGhost)}
 	 [] hunt then
-	    {Handle set(bg:blue)}
+     URL = {OS.getCWD}
+     ImgGhost={QTk.newImage photo(url:URL#"/images/ghostHunted.gif")}
+   in
+	    {Handle set(bg:white image:ImgGhost)}
 	 end
 	 State.1|{ChangeMode M Next}
       end
-   end      
-   
+   end
+
    fun{StateModification Grid Wanted State Fun}
       case State
       of nil then nil
@@ -295,10 +310,10 @@ in
    end
 
    proc{TreatStream Stream Grid Pacmans Ghosts Point Bonus}
-      {Browser.browse Stream.1}
+      %{Browser.browse Stream.1}
       case Stream
       of nil then skip
-      [] buildWindow|T then NewGrid in 
+      [] buildWindow|T then NewGrid in
 	 NewGrid = {BuildWindow}
 	 {TreatStream T NewGrid Pacmans Ghosts Point Bonus}
       [] initPacman(ID)|T then NewState in
@@ -311,7 +326,7 @@ in
       [] hidePacman(ID)|T then
 	 {TreatStream T Grid {StateModification Grid ID Pacmans {HidePacman}} Ghosts Point Bonus}
       [] initGhost(ID)|T then NewState in
-	 NewState = {InitGhost Grid ID} 
+	 NewState = {InitGhost Grid ID}
 	 {TreatStream T Grid Pacmans NewState|Ghosts Point Bonus}
       [] spawnGhost(ID Position)|T then
 	 {TreatStream T Grid Pacmans {StateModification Grid ID Ghosts {SpawnGhost Position}} Point Bonus}
@@ -344,8 +359,8 @@ in
 	 {TreatStream T Grid Pacmans Ghosts Point Bonus}
       end
    end
-   
-  
 
-   
+
+
+
 end
