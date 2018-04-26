@@ -21,6 +21,7 @@ define
    QuickSort
    GhostPos
    GotKilled
+   Reduce
 in
   % ID is a <pacman> ID
   fun{StartPlayer ID}
@@ -30,7 +31,7 @@ in
   in
      {NewPort Stream Port}
      GhostInit = {CreateTab 'null' Input.nbGhost}
-    State = playerPacman(id:ID spawn:_ pos:_ lives:input.nbLives score:0 alive:false mode:'classic' ghostPos:GhostInit)
+    State = playerPacman(id:ID spawn:_ pos:_ lives:Input.nbLives score:0 alive:false mode:'classic' ghostPos:GhostInit)
     thread
        {TreatStream Stream State}
     end
@@ -48,6 +49,7 @@ in
         NewState = {Spawn State ID P}
         {TreatStream T NewState}
      [] move(ID P)|T then NewState in
+	if Input.isTurnByTurn == false then {Delay ({OS.rand} mod (Input.thinkMax - Input.thinkMin))+Input.thinkMin} end
         NewState = {Move State ID P}
 	{TreatStream T NewState}
      [] bonusSpawn(P)|T then
@@ -70,7 +72,7 @@ in
 	NewState = {GhostPos ID.id P State}
 	{TreatStream T NewState}
      [] killGhost(IDg IDp NewScore)|T then NewState NewState2 in
-	NewState = {UpdateState State [score#(State.score + rewardKill)]}
+	NewState = {UpdateState State [score#(State.score + Input.rewardKill)]}
 	IDp = NewState.id
 	NewScore = NewState.score
 	NewState2 = {GhostPos IDg.id 'null' NewState}
@@ -108,9 +110,9 @@ in
   end
 
   
-  fun{GotKilled State ID NewLife NewSCore}
-     NewState NewScore in
-     NewState = {UpdateState State [alive#false score#(State.score - input.penalityKill) lives#(State.lives - 1)]}
+  fun{GotKilled State ID NewLife NewScore}
+     NewState  in
+     NewState = {UpdateState State [alive#false score#(State.score - Input.penalityKill) lives#(State.lives - 1)]}
      ID = NewState.id
      NewLife = NewState.lives
      NewScore = NewState.score
@@ -160,18 +162,27 @@ in
 	   else {Nth Choices N} end
 	end
      end
-  in
-     {FindCloser X Y L GhostPos GhostID}
-     Prefs = {Pref X Y GhostPos.x GhostPos.y Mode}
-     
-     C1 = {Check (X+1 mod Input.nColumn) Y nil}
-     if X == 1 then C2 = {Check Input.nColumn Y C1} 
+  in   
+     if X == Input.nColumn then C1 = {Check 1 Y nil}
+     else C1 = {Check X+1 Y nil} end
+     if X == 1 then C2 = {Check Input.nColumn Y C1}
      else C2 = {Check X-1 Y C1} end
-     C3  = {Check X (Y+1 mod Input.nRow) C2}
+     if Y == Input.nRow then C3  = {Check X 1 C2}
+     else C3 = {Check X Y+1 C2} end
      if Y == 1 then Choices = {Check X Input.nRow C3}
      else Choices = {Check X Y-1 C3} end
 
-    {Available Choices Prefs}
+
+     {FindCloser X Y L GhostPos GhostID}
+     if GhostPos == 'null' then Choices2 Rnd in
+	Choices2 = {Reduce Choices 'null'}
+	Rnd = ({OS.rand} mod {Length Choices2}) + 1
+	{Nth Choices2 Rnd}
+     else
+	Prefs = {Pref X Y GhostPos.x GhostPos.y Mode}
+	{Available Choices Prefs}
+     end
+     
   end
 
 
@@ -199,9 +210,15 @@ in
 
   fun{Check X Y L}
     Val in
-    Val = {Nth {Nth Input.map Y} X}
-    if Val == 1 then 'null'|L
-    else pt(x:X y:Y)|L end
+    if X < 1 then 'null'|L
+    elseif X > Input.nColumn then 'null'|L
+    elseif Y < 1 then 'null'|L
+    elseif Y > Input.nRow then 'null'|L
+    else
+        Val = {Nth {Nth Input.map Y} X}
+        if Val == 1 then 'null'|L
+        else pt(x:X y:Y)|L end
+    end
   end
 
   fun{Pref X1 Y1 X2 Y2 Mode}
@@ -211,18 +228,22 @@ in
      EastDist
   in
      if X1 > X2 then
-	WestDist = X1 - X2
+        if X1 == X2 then WestDist = Input.nColumn
+	else WestDist = X1 - X2 end
 	EastDist = X2 + Input.nColumn - X1
      else
 	WestDist = X1 - X2 + Input.nColumn
-	EastDist = X2 - X1
+        if X1 == X2 then EastDist = Input.nColumn
+	else EastDist = X2 - X1 end
      end
      if Y1 > Y2 then
-	NordDist = Y1 - Y2
+        if Y1 == Y2 then NordDist = Input.nRow
+	else NordDist = Y1 - Y2 end
 	SudDist = Y2 + Input.nRow - Y1
      else
 	NordDist = Y1 - Y2 + Input.nRow
-	SudDist = Y2 - Y1
+        if Y2 == Y1 then SudDist = Input.nRow
+	else SudDist = Y2 - Y1 end
      end
      {QuickSort [NordDist#1 SudDist#2 WestDist#3 EastDist#4] Mode}
   end
@@ -290,6 +311,14 @@ in
      end
   in
      {ModTabAcc Tab N Val 1}
+  end
+
+  fun{Reduce L Val}
+     case L of H|T then
+	if H == Val then {Reduce T Val}
+	else H|{Reduce T Val} end
+     [] nil then nil
+     end
   end
     
 end
