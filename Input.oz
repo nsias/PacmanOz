@@ -53,13 +53,13 @@ in
 
    NRow = 7
    NColumn = 12
-   Map = [[1 1 1 1 1 1 1 1 1 1 1 1]
-	  [1 0 0 0 0 0 0 0 0 0 0 1]
-	  [1 0 1 1 1 0 1 1 0 1 0 1]
-	  [1 0 0 0 1 1 1 1 0 1 0 1]
-	  [1 0 1 1 0 0 1 1 0 1 0 1]
-	  [1 4 1 2 0 3 1 1 2 0 0 1]
-	  [1 1 1 1 1 1 1 1 1 1 1 1]]
+   Map = [[1 1 0 1 0 1 0 1 1 0 1 1]
+	  [1 0 0 0 0 0 0 1 2 0 0 1]
+	  [0 2 1 1 1 0 1 1 0 1 0 0]
+	  [1 0 0 0 1 0 0 4 0 1 0 1]
+	  [0 0 1 0 0 0 1 1 0 1 0 0]
+	  [1 0 1 4 1 3 0 0 0 0 3 1]
+	  [1 1 1 0 0 1 0 1 1 0 1 1]]
 
 %%%% Respawn times %%%%
 
@@ -77,16 +77,16 @@ in
 %%%%
 
    NbLives = 2
-   HuntTime = 5000
+   HuntTime = 10
 
 %%%% Players description %%%%
 
    NbPacman = 2
-   Pacman = [pacman000random pacman000random]
+	Pacman = [pacman085smart pacman085smart]
    ColorPacman = [yellow red]
-   NbGhost = 1
-   Ghost = [ghost000random]
-   ColorGhost = [green black red white]
+   NbGhost = 2
+	Ghost = [ghost085smart ghost085smart]
+   ColorGhost = [green white red black]
 
 %%%% Thinking parameters (only in simultaneous) %%%%
 
