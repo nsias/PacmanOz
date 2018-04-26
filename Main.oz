@@ -224,7 +224,7 @@ in
   end
 
   fun {NewPlayerState}
-    fun {AddPacmanState Count}
+    fun {AddPacmanState Count CountSpawn}
       if Count > Input.nbPacman then
         nil
       else
@@ -232,14 +232,23 @@ in
         Port = {List.nth AllPacmanPort Count}
         Color = {List.nth Input.colorPacman Count}
         Name = {List.nth Input.pacman Count}
-        Spawn = {List.nth AllSpawnPacmanInMap Count}
+        LengthSpawn = {List.length AllSpawnPacmanInMap}
+        Spawn
+        NewCountSpawn
       in
+        if CountSpawn < LengthSpawn then
+          Spawn = {List.nth AllSpawnPacmanInMap Count}
+          NewCountSpawn = CountSpawn+1
+        else
+          Spawn = {List.nth AllSpawnPacmanInMap 1}
+          NewCountSpawn = 2
+        end
         {Send Port getId(ID)}
-        state(port:Port id:pacman(id:ID color:Color name:Name) pos:Spawn isDead:false)|{AddPacmanState Count+1}
+        state(port:Port id:pacman(id:ID color:Color name:Name) pos:Spawn isDead:false)|{AddPacmanState Count+1 NewCountSpawn}
       end
     end
 
-    fun {AddGhostState Count}
+    fun {AddGhostState Count CountSpawn}
       if Count > Input.nbGhost then
         nil
       else
@@ -247,18 +256,27 @@ in
         Port = {List.nth AllGhostPort Count}
         Color = {List.nth Input.colorGhost Count}
         Name = {List.nth Input.ghost Count}
-        Spawn = {List.nth AllSpawnGhostInMap Count}
+        LengthSpawn = {List.length AllSpawnGhostInMap}
+        Spawn
+        NewCountSpawn
       in
+        if CountSpawn < LengthSpawn then
+          Spawn = {List.nth AllSpawnGhostInMap CountSpawn}
+          NewCountSpawn = CountSpawn+1
+        else
+          Spawn = {List.nth AllSpawnGhostInMap 1}
+          NewCountSpawn = 2
+        end
         {Send Port getId(ID)}
-        state(port:Port id:ghost(id:ID color:Color name:Name) pos:Spawn isDead:false)|{AddGhostState Count+1}
+        state(port:Port id:ghost(id:ID color:Color name:Name) pos:Spawn isDead:false)|{AddGhostState Count+1 NewCountSpawn}
       end
     end
 
     GhostState
     PacmanState
   in
-    GhostState = {AddGhostState 1}
-    PacmanState = {AddPacmanState 1}
+    GhostState = {AddGhostState 1 1}
+    PacmanState = {AddPacmanState 1 1}
     {CreateOrder PacmanState GhostState}
   end
 
@@ -843,24 +861,19 @@ end
 proc {PlayerAction State}
   Port = State.port
   ID = State.id
-  IsDead = State.isDead
   P
   NewState
   StateSent
 in
-  if IsDead == false then
-    {Send Port move(_ P)}
-    case P of 'null' then
-      StateSent = state(port:Port id:ID pos:P isDead:true)
-      {PlayerAction StateSent}
-    else
-      StateSent = state(port:Port id:ID pos:P isDead:IsDead)
-      {Send Server setNewState(StateSent NewState)}
-      {Wait NewState}
-      {PlayerAction NewState}
-    end
+  {Send Port move(_ P)}
+  case P of 'null' then
+    StateSent = state(port:Port id:ID pos:P isDead:true)
+    {PlayerAction StateSent}
   else
-    {PlayerAction State}
+    StateSent = state(port:Port id:ID pos:P isDead:false)
+    {Send Server setNewState(StateSent NewState)}
+    {Wait NewState}
+    {PlayerAction NewState}
   end
 end
 
@@ -1041,8 +1054,14 @@ in
   in
     RevivedPacman = {SpawnPacman DeathPacman}
     NewAllState = {UpdateList AllState RevivedPacman}
-    {TreatServer T NewAllState Point Bonus Hunt}
-
+    if {IsEndGame NewAllState} then
+      IDWinner
+    in
+      IDWinner = {GetWinner NewAllState}
+      {Send WindowPort displayWinner(IDWinner)}
+    else
+      {TreatServer T NewAllState Point Bonus Hunt}
+    end
   [] respawnGhost()|T then
     DeathGhost = {GetDeathGhost AllState}
     RevivedGhost
@@ -1058,8 +1077,7 @@ in
     {AlertSetMode NewHunt}
     {TreatServer T AllState Point Bonus NewHunt}
   [] M|T then
-    {Browser.browse 'MESSAGE SERVER WTF'#M}
-    %{Delay 50000}
+    {Browser.browse 'SimulatenousServer unsupported message'#M}
     {TreatServer T AllState Point Bonus Hunt}
   end
 end
@@ -1087,8 +1105,9 @@ end
         {GameSimultaneous InitialPlayerState AllPointInMap AllBonusInMap 0}
       end
    end
-
 end
 %TODO Spawn point/bonus : if spawned, get it => Refactoring point + bonus
 %TODO Spawnkill : if spawned, kill instantly => Refactoring again
-%TODO : Plusieurs pacmans sur le même spawn idem ghost
+%TODO : Comment
+%TODO : GUI
+%TODO : Rapport
