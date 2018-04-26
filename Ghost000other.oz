@@ -41,7 +41,8 @@ in
      [] spawn(ID P)|T then NewState in
         NewState = {Spawn State ID P}
         {TreatStream T NewState}
-     [] move(ID P)|T then NewState in
+      [] move(ID P)|T then NewState in
+	 if Input.isTurnByTurn == false then {Delay ({OS.rand} mod (Input.thinkMax - Input.thinkMin))+Input.thinkMin} end
         NewState = {Move State ID P}
 	{TreatStream T NewState}
      [] gotKilled()|T then NewState in
@@ -49,7 +50,7 @@ in
 	{TreatStream T NewState}
      [] pacmanPos(ID P)|T then
 	{TreatStream T State}
-     [] killPacman(ID)|T then State in
+     [] killPacman(ID)|T then 
 	{TreatStream T State}
      [] deathPacman(ID)|T then
 	{TreatStream T State}
@@ -67,10 +68,6 @@ in
 
    fun{Spawn State ID P}
     if State.alive then
-        ID = 'null'
-        P = 'null'
-        State
-    elseif State.lives < 1 then
         ID = 'null'
         P = 'null'
         State
@@ -102,25 +99,33 @@ in
 
 
   fun{NextPosition X Y}
-    Choices
-    Rnd
+     Choices
+     C1 C2 C3
+     Rnd
   in
-    if Y == 1 then {Check X Input.nRow Choices}
-    else {Check X Y-1 Choices} end
-    {Check X (Y+1 mod Input.nRow) Choices}
-    if X == 1 then {Check Input.nColumn Y Choices}
-    else {Check X-1 Y Choices} end
-    {Check (X+1 mod Input.nColumn) Y Choices}
-    Choices = nil
-    Rnd = ({OS.rand} mod {Length Choices}) + 1
-    {Nth Choices Rnd}
+     if X == Input.nColumn then C1 = {Check 1 Y nil}
+      else C1 = {Check X+1 Y nil} end
+      if X == 1 then C2 = {Check Input.nColumn Y C1}
+      else C2 = {Check X-1 Y C1} end
+      if Y == Input.nRow then C3  = {Check X 1 C2}
+      else C3 = {Check X Y+1 C2} end
+      if Y == 1 then Choices = {Check X Input.nRow C3}
+      else Choices = {Check X Y-1 C3} end
+      Rnd = ({OS.rand} mod {Length Choices}) + 1
+      {Nth Choices Rnd}
   end
 
-  proc{Check X Y Choices}
+  fun{Check X Y L}
     Val in
-    Val = {Nth {Nth Input.map Y} X}
-    if Val == 1 then Choices = _
-    else Choices = pt(x:X y:Y)|_ end
+    if X < 1 then L
+    elseif X > Input.nColumn then L
+    elseif Y < 1 then L
+    elseif Y > Input.nRow then L
+    else
+        Val = {Nth {Nth Input.map Y} X}
+        if Val == 1 then L
+        else pt(x:X y:Y)|L end
+    end
   end
 
   fun{UpdateState State L}
