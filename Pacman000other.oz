@@ -40,36 +40,37 @@ in
         NewState = {Spawn State ID P}
         {TreatStream T NewState}
      [] move(ID P)|T then NewState in
+	if Input.isTurnByTurn == false then {Delay ({OS.rand} mod (Input.thinkMax - Input.thinkMin))+Input.thinkMin}end
         NewState = {Move State ID P}
-	      {TreatStream T NewState}
+	{TreatStream T NewState}
      [] bonusSpawn(P)|T then
-	      {TreatStream T State}
+	{TreatStream T State}
      [] pointSpawn(P)|T then
-	      {TreatStream T State}
+	{TreatStream T State}
      [] bonusRemoved(P)|T then
-	      {TreatStream T State}
+	{TreatStream T State}
      [] pointRemoved(P)|T then
-	      {TreatStream T State}
+	{TreatStream T State}
      [] addPoint(Add ID NewScore)|T then NewState in
-	      NewState = {UpdateState State [score#(State.score + Add)]}
-	      ID = NewState.id
-	      NewScore = NewState.score
-	      {TreatStream T NewState}
+	NewState = {UpdateState State [score#(State.score + Add)]}
+	ID = NewState.id
+	NewScore = NewState.score
+	{TreatStream T NewState}
      [] gotKilled(ID NewLife NewScore)|T then NewState in
-	      NewState = {GotKilled State ID NewLife NewScore}
-	      {TreatStream T NewState}
+	NewState = {GotKilled State ID NewLife NewScore}
+	{TreatStream T NewState}
      [] ghostPos(ID P)|T then
-	      {TreatStream T State}
+	{TreatStream T State}
      [] killGhost(IDg IDp NewScore)|T then NewState in
-	      NewState = {UpdateState State [score#(State.score + rewardKill)]}
-	      IDp = NewState.id
-	      NewScore = NewState.score
-	      {TreatStream T NewState}
+	NewState = {UpdateState State [score#(State.score + Input.rewardKill)]}
+	IDp = NewState.id
+	NewScore = NewState.score
+	{TreatStream T NewState}
      [] deathGhost(ID)|T then
-	      {TreatStream T State}
-     []setMode(M)|T then NewState in
-	      NewState = {UpdateState State [mode#M]}
-	      {TreatStream T NewState}
+	{TreatStream T State}
+     [] setMode(M)|T then NewState in
+	NewState = {UpdateState State [mode#M]}
+	{TreatStream T NewState}
      end
   end
 
@@ -113,30 +114,38 @@ in
 
 
 
-  fun{NextPosition X Y}
-    Choices
-    Rnd
-  in
-    if Y == 1 then {Check X Input.nRow Choices}
-    else {Check X Y-1 Choices} end
-    {Check X (Y+1 mod Input.nRow) Choices}
-    if X == 1 then {Check Input.nColumn Y Choices}
-    else {Check X-1 Y Choices} end
-    {Check (X+1 mod Input.nColumn) Y Choices}
-    Choices = nil
-    Rnd = ({OS.rand} mod {Length Choices}) + 1
-    {Nth Choices Rnd}
+   fun{NextPosition X Y}
+      Choices
+      C1 C2 C3
+      Rnd
+   in
+      if X == Input.nColumn then C1 = {Check 1 Y nil}
+      else C1 = {Check X+1 Y nil} end
+      if X == 1 then C2 = {Check Input.nColumn Y C1}
+      else C2 = {Check X-1 Y C1} end
+      if Y == Input.nRow then C3  = {Check X 1 C2}
+      else C3 = {Check X Y+1 C2} end
+      if Y == 1 then Choices = {Check X Input.nRow C3}
+      else Choices = {Check X Y-1 C3} end
+      Rnd = ({OS.rand} mod {Length Choices}) + 1
+      {Nth Choices Rnd}
   end
 
-  proc{Check X Y Choices}
+  fun{Check X Y L}
     Val in
-    Val = {Nth {Nth Input.map Y} X}
-    if Val == 1 then Choices = _
-    else Choices = pt(x:X y:Y)|_ end
+    if X < 1 then L
+    elseif X > Input.nColumn then L
+    elseif Y < 1 then L
+    elseif Y > Input.nRow then L
+    else
+        Val = {Nth {Nth Input.map Y} X}
+        if Val == 1 then L
+        else pt(x:X y:Y)|L end
+    end
   end
 
-  fun{GotKilled State ID NewLife NewSCore}
-     NewState NewScore in
+  fun{GotKilled State ID NewLife NewScore}
+     NewState in
      NewState = {UpdateState State [alive#false score#(State.score - Input.penalityKill) lives#(State.lives - 1)]}
      ID = NewState.id
      NewLife = NewState.lives
