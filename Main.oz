@@ -53,6 +53,7 @@ define
    %%%%% ENCOUNTER RESOLUTION %%%
    MeetOpponent
    Kill
+   ResolveEncounterAfterSpawn
    %%%%% GAME %%%%%
    GameTurnByTurn
    IsEndGame
@@ -667,6 +668,84 @@ in
   in
     {CheckWinner State _ MinScore-1}
   end
+
+  fun {ResolveEncounterAfterSpawn AllState Hunt}
+    fun {ResolveEncounter MyState Hunt Encounter AllState}
+      NewState
+      Port = MyState.port
+      ID = MyState.id
+      P = MyState.pos
+      NewState
+    in
+      case {Record.label ID} of 'pacman' then
+        if Hunt == 0 then
+          LengthListGhost = {List.length Encounter}
+          Random  = ({OS.rand} mod LengthListGhost) + 1
+          GetGhost = {List.nth Encounter Random}
+          GhostState = {List.nth AllState GetGhost}
+          NewLife
+          NewScore
+        in
+          {Send WindowPort hidePacman(ID)}
+          {Send Port gotKilled(_ NewLife NewScore)}
+          {Send WindowPort scoreUpdate(ID NewScore)}
+          {Send WindowPort lifeUpdate(ID NewLife)}
+          {Send GhostState.port killPacman(ID)}
+          {AlertDeathPacman ID}
+          NewState = [state(port:Port id:ID pos:P isDead:true)]
+        else
+          NewState = {Kill MyState AllState Encounter MyState.pos}
+        end
+        {UpdateList AllState NewState}
+      [] 'ghost' then
+        if Hunt == 0 then
+          NewState = {Kill MyState AllState Encounter MyState.pos}
+        else
+          LengthListPacman = {List.length Encounter}
+          Random  = ({OS.rand} mod LengthListPacman) + 1
+          GetPacman = {List.nth Encounter Random}
+          PacmanState = {List.nth AllState GetPacman}
+          NewScore
+        in
+          {Send WindowPort hideGhost(ID)}
+          {Send Port gotKilled()}
+          {Send PacmanState.port killGhost(ID _ NewScore)}
+          {Send WindowPort scoreUpdate(PacmanState.id NewScore)}
+          {AlertDeathGhost ID}
+          NewState = [state(port:Port id:ID pos:P isDead:true)]
+        end
+        {UpdateList AllState NewState}
+      end
+    end
+
+    fun {MeetEncounter State Hunt AllState}
+      case State of nil then
+        nil
+      [] H|T then
+        Encounter = {MeetOpponent AllState H.id H.pos}
+      in
+        case Encounter of nil then
+          {MeetEncounter T Hunt AllState}
+        [] HE|TE then
+          if H.isDead == false then
+          {Browser.browse 'KILL SPAWN'}
+          {ResolveEncounter H Hunt Encounter AllState}
+          else
+            {MeetEncounter T Hunt AllState}
+          end
+        end
+      end
+    end
+    NewAllState
+  in
+    NewAllState = {MeetEncounter AllState Hunt AllState}
+    case NewAllState of nil then
+      AllState
+    [] H|T then
+      {Browser.browse 'Resolve'#NewAllState}
+      {ResolveEncounterAfterSpawn NewAllState Hunt}
+    end
+  end
 %%%%%%%%%%%%% MAIN TURN BY TURN %%%%%%
 proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
 %%%%%%% RESPAWN CHECK %%%%%%
@@ -699,27 +778,33 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
         NewState1
         DeathGhost
         RevivedGhost
+        NewStateBeforeKill
       in
         DeathPacman = {GetDeathPacman AllState}
         RevivedPacman = {SpawnPacman DeathPacman}
         NewState1 = {UpdateList AllState RevivedPacman}
         DeathGhost = {GetDeathGhost AllState}
         RevivedGhost = {SpawnGhost DeathGhost}
-        NewState = {UpdateList NewState1 RevivedGhost}
+        NewStateBeforeKill = {UpdateList NewState1 RevivedGhost}
+        NewState = {ResolveEncounterAfterSpawn NewStateBeforeKill Hunt}
       elseif Turn mod Input.respawnTimePacman == 0 then
         DeathPacman
         RevivedPacman
+        NewStateBeforeKill
       in
         DeathPacman = {GetDeathPacman AllState}
         RevivedPacman = {SpawnPacman DeathPacman}
-        NewState = {UpdateList AllState RevivedPacman}
+        NewStateBeforeKill = {UpdateList AllState RevivedPacman}
+        NewState = {ResolveEncounterAfterSpawn NewStateBeforeKill Hunt}
       elseif Turn mod Input.respawnTimeGhost == 0 then
         DeathGhost
         RevivedGhost
+        NewStateBeforeKill
       in
         DeathGhost = {GetDeathGhost AllState}
         RevivedGhost = {SpawnGhost DeathGhost}
-        NewState = {UpdateList AllState RevivedGhost}
+        NewStateBeforeKill = {UpdateList AllState RevivedGhost}
+        NewState = {ResolveEncounterAfterSpawn NewStateBeforeKill Hunt}
       else
         NewState = AllState
       end
@@ -1027,6 +1112,7 @@ in
            {Send Port gotKilled()}
            {Send PacmanState.port killGhost(ID _ NewScore)}
            {Send WindowPort scoreUpdate(PacmanState.id NewScore)}
+           {AlertDeathGhost ID}
            StateToSend = state(port:Port id:ID pos:P isDead:true)
            NewState = [State]
          end
@@ -1050,25 +1136,29 @@ in
   [] respawnPacman()|T then
     DeathPacman = {GetDeathPacman AllState}
     RevivedPacman
+    NewAllStateBeforeKill
     NewAllState
   in
     RevivedPacman = {SpawnPacman DeathPacman}
-    NewAllState = {UpdateList AllState RevivedPacman}
-    if {IsEndGame NewAllState} then
+    NewAllStateBeforeKill = {UpdateList AllState RevivedPacman}
+    if {IsEndGame NewAllStateBeforeKill} then
       IDWinner
     in
-      IDWinner = {GetWinner NewAllState}
+      IDWinner = {GetWinner NewAllStateBeforeKill}
       {Send WindowPort displayWinner(IDWinner)}
     else
+      NewAllState = {ResolveEncounterAfterSpawn NewAllStateBeforeKill Hunt}
       {TreatServer T NewAllState Point Bonus Hunt}
     end
   [] respawnGhost()|T then
     DeathGhost = {GetDeathGhost AllState}
     RevivedGhost
     NewAllState
+    NewAllStateBeforeKill
   in
     RevivedGhost = {SpawnGhost DeathGhost}
-    NewAllState = {UpdateList AllState RevivedGhost}
+    NewAllStateBeforeKill = {UpdateList AllState RevivedGhost}
+    NewAllState = {ResolveEncounterAfterSpawn NewAllStateBeforeKill Hunt}
     {TreatServer T NewAllState Point Bonus Hunt}
   [] stopHunt()|T then
     NewHunt
@@ -1106,7 +1196,7 @@ end
       end
    end
 end
-%TODO Spawn point/bonus : if spawned, get it => Refactoring point + bonus
+
 %TODO Spawnkill : if spawned, kill instantly => Refactoring again
 %TODO : Comment
 %TODO : GUI
