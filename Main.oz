@@ -237,8 +237,8 @@ in
         Spawn
         NewCountSpawn
       in
-        if CountSpawn < LengthSpawn then
-          Spawn = {List.nth AllSpawnPacmanInMap Count}
+        if CountSpawn =< LengthSpawn then
+          Spawn = {List.nth AllSpawnPacmanInMap CountSpawn}
           NewCountSpawn = CountSpawn+1
         else
           Spawn = {List.nth AllSpawnPacmanInMap 1}
@@ -261,7 +261,7 @@ in
         Spawn
         NewCountSpawn
       in
-        if CountSpawn < LengthSpawn then
+        if CountSpawn =< LengthSpawn then
           Spawn = {List.nth AllSpawnGhostInMap CountSpawn}
           NewCountSpawn = CountSpawn+1
         else
@@ -1000,9 +1000,9 @@ proc {CheckRespawnGhost}
 end
 % Procédure attendant un temps donné par l'Input pour envoyer au serveur
 % stopHunt()
-proc {LaunchTimerHunt}
+proc {LaunchTimerHunt IDHunt}
   {Delay Input.huntTime * 1000}
-  {Send Server stopHunt()}
+  {Send Server stopHunt(IDHunt)}
 end
 % Procédure principale du simultanée
 proc {GameSimultaneous AllState Point Bonus Hunt}
@@ -1065,12 +1065,12 @@ in
            BonusRemoved = {List.nth Bonus GetBonus}
          in
            NewPoint = Point
-           NewHunt = 1
+           NewHunt = Hunt + 1
            NewBonus = {RemoveFromList Bonus BonusRemoved}
            {Send WindowPort hideBonus(P)}
            {AlertBonusRemoved P}
            {AlertSetMode 'hunt'}
-           thread {LaunchTimerHunt} end
+           thread {LaunchTimerHunt NewHunt} end
          else
             NewBonus = Bonus
             NewPoint = Point
@@ -1176,11 +1176,15 @@ in
     NewAllStateBeforeKill = {UpdateList AllState RevivedGhost}
     NewAllState = {ResolveEncounterAfterSpawn NewAllStateBeforeKill Hunt}
     {TreatServer T NewAllState Point Bonus Hunt}
-  [] stopHunt()|T then
+  [] stopHunt(IDHunt)|T then
     NewHunt
   in
-    NewHunt = 'classic'
-    {AlertSetMode NewHunt}
+    if Hunt == IDHunt then
+      NewHunt = 'classic'
+      {AlertSetMode NewHunt}
+    else
+      NewHunt = Hunt
+    end
     {TreatServer T AllState Point Bonus NewHunt}
   [] M|T then
     {Browser.browse 'SimulatenousServer unsupported message'#M}
