@@ -47,26 +47,28 @@ in
 
 %%%% Style of game %%%%
 
-   IsTurnByTurn = false
+   IsTurnByTurn = true
 
 %%%% Description of the map %%%%
 
-   NRow = 7
-   NColumn = 12
-   Map = [[1 1 1 1 1 1 1 1 1 1 1 1]
-	  [1 0 0 0 0 0 0 0 0 0 0 1]
-	  [1 1 1 1 1 0 1 1 0 1 0 1]
-	  [0 0 0 0 1 0 0 1 0 1 0 0]
-	  [1 2 1 0 1 0 1 1 0 1 0 1]
-	  [1 4 1 0 3 0 2 1 0 0 0 1]
-	  [1 1 1 1 1 1 1 1 1 1 1 1]]
-
+   NRow = 9
+   NColumn = 13
+   Map = [[1 1 0 1 0 1 0 1 1 0 1 1 0]
+	  [1 0 0 0 0 0 0 1 2 0 0 1 3]
+	  [0 2 1 1 1 0 1 1 0 1 0 0 0]
+	  [1 0 0 0 1 0 0 4 0 1 0 1 1]
+	  [0 0 1 0 0 0 1 1 0 1 0 0 0]
+	  [1 0 1 0 1 3 0 0 0 0 3 1 0]
+	  [1 1 1 0 0 1 0 1 1 0 1 0 0]
+	  [2 0 0 1 0 1 0 0 1 0 1 0 1]
+	  [0 1 0 1 3 1 4 1 1 0 0 0 0]]
+   
 %%%% Respawn times %%%%
 
    RespawnTimePoint = 10
    RespawnTimeBonus = 15
-   RespawnTimePacman = 3
-   RespawnTimeGhost = 2
+   RespawnTimePacman = 5
+   RespawnTimeGhost = 5
 
 %%%% Rewards and penalities %%%%
 
@@ -77,16 +79,16 @@ in
 %%%%
 
    NbLives = 2
-   HuntTime = 7
+   HuntTime = 10
 
-%%%% Players description %%%
+%%%% Players description %%%%
 
-   NbPacman = 2
-   Pacman = [pacman000random pacman000random]
+   NbPacman = 3
+   Pacman = [pacman085smart pacman085smart pacman085random]
    ColorPacman = [yellow red blue]
-   NbGhost = 1
-   Ghost = [ghost000random]
-   ColorGhost = [green black red white]
+   NbGhost = 2
+   Ghost = [ghost085smart ghost085smart]
+   ColorGhost = [green white red]
 
 %%%% Thinking parameters (only in simultaneous) %%%%
 
