@@ -944,7 +944,7 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
 
       %case NewAllState of _ then
       NewAllState = {UpdateList AllState NewState}
-      %end
+      {Delay 200}
       {GameTurnByTurn NewAllState NewPoint NewBonus NewHunt Round+1 Turn}
     end
   end
