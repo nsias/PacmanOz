@@ -67,8 +67,7 @@ define
 
 in
 
-  % TODO add additionnal function
-%%%%%%%%%%% UTILITARY FUNCTIONS %%%%%%%%%%%
+  % Crée une liste qui ordonne les joueurs , alternant pacman et ghost
   fun {CreateOrder Pacman Ghost}
     fun {PlaceGhost Pacman Ghost Count}
       if Count > Input.nbGhost then
@@ -86,7 +85,7 @@ in
   in
     {PlacePacman Pacman Ghost 1}
   end
-
+  % Met à jour la liste L1 à l'aide de la liste L2
   fun {UpdateList L1 L2}
     fun {IsInList L X Count}
       case L of nil then
@@ -116,7 +115,7 @@ in
   in
     {Update L1 L2}
   end
-
+  % Donne l'index d'un élément dans une liste
   fun {NthFromList L X}
     fun{IsInList L X Count}
       case L of nil then
@@ -132,7 +131,7 @@ in
   in
     {IsInList L X 1}
   end
-
+  % Retire un élément d'une liste
   fun {RemoveFromList L X}
     case L of nil then
       nil
@@ -144,7 +143,7 @@ in
       end
     end
   end
-
+  % Renvoie une liste de tout ce qui manque à L2 pour être L1
   fun {GetMissingFromList L1 L2}
     fun {IsRemovedInList X L2}
       case L2 of nil then
@@ -169,7 +168,8 @@ in
     end
   end
 
-%%%%%%%%%%% INITIALISATION FUNCTIONS %%%%%%%%%%%
+  % Fonction qui retourne la liste des positions des valeurs correspondant
+  %à Value et qui sont présents sur la map donnée par l'Input.
   fun {ListPositionInMap Map Value}
     fun {FindPointRow Row Value X Y}
       case Row of nil then
@@ -199,7 +199,7 @@ in
     {FindPoint Map Value 1 1}
   end
 
-
+  % Fonction qui crée et ouvre le port de chaque pacman présent dans la partie
   fun {NewPacmanPort}
     fun {AddPacmanPort Count}
       if Count > Input.nbPacman then
@@ -211,7 +211,7 @@ in
   in
     {AddPacmanPort 1}
   end
-
+  % Fonction qui crée et ouvre le port de chaque ghost présent dans la partie
   fun {NewGhostPort}
     fun {AddGhostPort Count}
       if Count > Input.nbGhost then
@@ -223,7 +223,7 @@ in
   in
     {AddGhostPort 1}
   end
-
+  % Fonction qui retourne la liste des états initials des joueurs
   fun {NewPlayerState}
     fun {AddPacmanState Count CountSpawn}
       if Count > Input.nbPacman then
@@ -281,6 +281,8 @@ in
     {CreateOrder PacmanState GhostState}
   end
 
+  % Procédure d'initiation du jeu : initie les points, bonus, spawns, pacmans
+  % ghosts
   proc {InitGame}
     proc {InitPlayer State}
       case State of nil then
@@ -334,7 +336,8 @@ in
       {InitBonus AllBonusInMap}
   end
 
-%%%%%%%%%%%%%% GAME %%%%%%%%%%%%%%%
+  % Fonction retournant la liste des ennemis rencontrés par le joueur de
+  % l'id ID et de la position P
   fun {MeetOpponent State ID P}
 
     fun {Meet State ID P Count}
@@ -372,6 +375,8 @@ in
   {Meet State ID P 1}
   end
 
+  % Fonction qui effectue le meurtre de chaque Victim par un Killer
+  % Retourne le nouvel état de chaque acteur de ce meutre
   fun {Kill Killer AllState Victim P}
     proc {Killing Killer AllState Victim}
       case Victim of nil then skip
@@ -420,7 +425,7 @@ in
   end
 
 
-%%%%%%%%%%%%% ALERT MESSAGE %%%%%%%%%%%%%
+ % Avertit les pacmans de la nouvelle position d'un ghost
   proc {AlertPosGhost ID P}
     proc {Alert Port ID P}
       case Port of nil then
@@ -433,7 +438,7 @@ in
     in
       {Alert AllPacmanPort ID P}
     end
-
+  % Avertit les ghosts de la nouvelle position d'un pacman
   proc {AlertPosPacman ID P}
     proc {Alert Port ID P}
       case Port of nil then
@@ -446,7 +451,7 @@ in
     in
       {Alert AllGhostPort ID P}
   end
-
+  % Avertit les pacmans de la disparition d'un point
   proc {AlertPointRemoved P}
     proc {Alert Port P}
       case Port of nil then
@@ -459,7 +464,7 @@ in
   in
     {Alert AllPacmanPort P}
   end
-
+  % Avertit les pacmans de la disparition d'un bonus
   proc {AlertBonusRemoved P}
     proc {Alert Port P}
       case Port of nil then
@@ -472,7 +477,7 @@ in
   in
     {Alert AllPacmanPort P}
   end
-
+  % Avertit les ghosts de la mort d'un pacman
   proc {AlertDeathPacman ID}
     proc {Alert Port ID}
       case Port of nil then
@@ -485,7 +490,7 @@ in
   in
     {Alert AllGhostPort ID}
   end
-
+  % Avertit les pacmans de l'apparition d'un point
   proc {AlertPointSpawn P}
     proc {Alert Port P}
       case Port of nil then
@@ -498,7 +503,7 @@ in
   in
     {Alert AllPacmanPort P}
   end
-
+  % Avertit les pacmans de l'apparition d'un bonus
   proc {AlertBonusSpawn P}
     proc {Alert Port P}
       case Port of nil then
@@ -512,6 +517,7 @@ in
     {Alert AllPacmanPort P}
   end
 
+  % Avertit les pacmans de la mort d'un ghost
   proc {AlertDeathGhost ID}
     proc {Alert Port ID}
       case Port of nil then
@@ -524,7 +530,7 @@ in
   in
     {Alert AllPacmanPort ID}
   end
-
+  % Avertit les ghosts et pacmans et le GUI du changement de mode
   proc {AlertSetMode Hunt}
     proc {Alert Port Hunt}
       case Port of nil then
@@ -540,9 +546,7 @@ in
     {Send WindowPort setMode(Hunt)}
   end
 
-
-
-%%%%%%%%%%%%% RESPAWN RESOLUTION %%%%%%%%%%%%%%
+  % Fonction spawn les points, prenant en argument une liste de points
   proc {SpawnPoint Point}
     case Point of nil then
       skip
@@ -552,7 +556,7 @@ in
       {SpawnPoint T}
     end
   end
-
+  % Fonction spawn les bonus, prenant en argument une liste de bonus
   proc {SpawnBonus Bonus}
     case Bonus of nil then
       skip
@@ -562,7 +566,7 @@ in
       {SpawnBonus T}
     end
   end
-
+  % Récupère l'ensemble des pacmans morts durant la partie
   fun {GetDeathPacman State}
     case State of nil then
       nil
@@ -580,7 +584,7 @@ in
       end
     end
   end
-
+    % Spawn l'ensemble des pacmans présents dans le State, renvoyant leurs états
   fun {SpawnPacman State}
     case State of nil then
       nil
@@ -597,7 +601,7 @@ in
       end
     end
   end
-
+  % Spawn l'ensemble des ghosts présents dans le State, renvoyant leurs états
   fun {SpawnGhost State}
     case State of nil then
       nil
@@ -611,6 +615,7 @@ in
     end
   end
 
+  % Fonction récupèrant les états de chaque ghost mort
   fun {GetDeathGhost State}
     case State of nil then
       nil
@@ -629,6 +634,8 @@ in
     end
   end
 
+  % Fonction vérifiant si le jeu est terminée
+  % Retourne true ou false
   fun {IsEndGame State}
     case State of nil then
       true
@@ -645,6 +652,7 @@ in
     end
   end
 
+  % Récupère le pacman ayant le meilleur score
   fun {GetWinner State}
     fun {CheckWinner State ID BestScore}
       case State of nil then
@@ -668,7 +676,8 @@ in
   in
     {CheckWinner State _ MinScore-1}
   end
-
+  % Fonction qui renvoie l'ensemble des états des joueurs après la résolution
+  % des recontres lors d'un respawn
   fun {ResolveEncounterAfterSpawn AllState Hunt}
     fun {ResolveEncounter MyState Hunt Encounter AllState}
       NewState
@@ -746,7 +755,7 @@ in
       {ResolveEncounterAfterSpawn NewAllState Hunt}
     end
   end
-%%%%%%%%%%%%% MAIN TURN BY TURN %%%%%%
+% Procédure principale du turn by turn
 proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
 %%%%%%% RESPAWN CHECK %%%%%%
   if Round == 0 then
@@ -942,7 +951,7 @@ proc {GameTurnByTurn AllState Point Bonus Hunt Round Turn}
     end
   end
 end
-%%%%%%%%%%%%%% SIMULTANEOUS GAME %%%%%%%%%%%%%%%%%%%%%
+% Thread infini représentant l'action d'un joueur en simultanée
 proc {PlayerAction State}
   Port = State.port
   ID = State.id
@@ -961,36 +970,41 @@ in
     {PlayerAction NewState}
   end
 end
-
+% Thread infini envoyant un message respawnPoint au serveur après un certain
+% temps donnée par l'Input
 proc {CheckRespawnPoint}
   {Delay Input.respawnTimePoint * 1000}
   {Send Server respawnPoint()}
   {CheckRespawnPoint}
 end
-
+% Thread infini envoyant un message respawnBonus au serveur après un certain
+% temps donnée par l'Input
 proc {CheckRespawnBonus}
   {Delay Input.respawnTimeBonus * 1000}
   {Send Server respawnBonus()}
   {CheckRespawnBonus}
 end
-
+% Thread infini envoyant un message respawnPacman au serveur après un certain
+% temps donnée par l'Input
 proc {CheckRespawnPacman}
   {Delay Input.respawnTimePacman * 1000}
   {Send Server respawnPacman()}
   {CheckRespawnPacman}
 end
-
+% Thread infini envoyant un message respawnGhost au serveur après un certain
+% temps donnée par l'Input
 proc {CheckRespawnGhost}
   {Delay Input.respawnTimeGhost * 1000}
   {Send Server respawnGhost()}
   {CheckRespawnGhost}
 end
-
+% Procédure attendant un temps donné par l'Input pour envoyer au serveur
+% stopHunt()
 proc {LaunchTimerHunt}
   {Delay Input.huntTime * 1000}
   {Send Server stopHunt()}
 end
-
+% Procédure principale du simultanée
 proc {GameSimultaneous AllState Point Bonus Hunt}
   proc {LaunchPlayer State}
     case State of nil then
@@ -1011,6 +1025,8 @@ in
   thread {CheckRespawnGhost} end
 end
 
+% Thread du serveur en simultanée modifiant l'état du jeu en fonction des
+% messages reçus par les autres threads
 proc {TreatServer Stream AllState Point Bonus Hunt}
   StateToSend
 in
@@ -1180,7 +1196,7 @@ end
       {Send WindowPort buildWindow}
 
       % TODO complete
-      %%%%% INITIALISATION VALUE %%%%%
+      %%%%% Initialisation %%%%%
       AllPointInMap = {ListPositionInMap Input.map 0}
       AllBonusInMap = {ListPositionInMap Input.map 4}
       AllSpawnPacmanInMap = {ListPositionInMap Input.map 2}
@@ -1189,6 +1205,7 @@ end
       AllGhostPort = {NewGhostPort}
       InitialPlayerState = {NewPlayerState}
       {InitGame}
+      %%%%% Lancement du jeu %%%%%
       if Input.isTurnByTurn then
         {GameTurnByTurn InitialPlayerState AllPointInMap AllBonusInMap 0 1 1}
       else
@@ -1197,7 +1214,5 @@ end
    end
 end
 
-%TODO Spawnkill : if spawned, kill instantly => Refactoring again
 %TODO : Comment
-%TODO : GUI
 %TODO : Rapport
