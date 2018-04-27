@@ -737,7 +737,6 @@ in
           {MeetEncounter T Hunt AllState}
         [] HE|TE then
           if H.isDead == false then
-          {Browser.browse 'KILL SPAWN'}
           {ResolveEncounter H Hunt Encounter AllState}
           else
             {MeetEncounter T Hunt AllState}
@@ -751,7 +750,6 @@ in
     case NewAllState of nil then
       AllState
     [] H|T then
-      {Browser.browse 'Resolve'#NewAllState}
       {ResolveEncounterAfterSpawn NewAllState Hunt}
     end
   end
